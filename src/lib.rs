@@ -1,9 +1,12 @@
 #![allow(unused)]
 use byteorder::{ReadBytesExt, WriteBytesExt, BE};
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::fs;
-use std::io::{self, Read, Write};
+use std::hash::Hasher;
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use thiserror::Error;
 
@@ -17,6 +20,15 @@ pub enum KvsError {
         #[from]
         source: io::Error,
     },
+    #[error("bincode: {}", .source)]
+    Serialize {
+        #[from]
+        source: bincode::Error,
+    },
+    #[error("max key length({}) exceeded", Entry::MAX_KEY_LENGTH)]
+    MaxKeyLength,
+    #[error("max value bytes({}) exceeded", Entry::MAX_VALUE_BYTES)]
+    MaxValueBytes,
     #[error("unknown err")]
     Unknown,
 }
@@ -33,10 +45,9 @@ impl KvsError {
 
 pub type Result<T> = std::result::Result<T, KvsError>;
 
-type Index = HashMap<String, u64>;
-
 pub struct Kvs {
     data: fs::File,
+    index: Index,
 }
 
 impl Kvs {
@@ -50,18 +61,62 @@ impl Kvs {
             },
         }
 
-        let data = fs::OpenOptions::new()
+        let mut data = fs::OpenOptions::new()
             .append(true)
             .create(true)
             .read(true)
             .write(true)
             .open(&Path::new(ROOT_DIR).join(DATA_FILE))?;
 
-        Ok(Kvs { data })
+        let index = Index::construct_from(&mut data)?;
+
+        Ok(Kvs { data, index })
     }
 
-    pub fn store<K: AsRef<str>, V: Serialize>(&mut self, key: K, value: V) -> Result<Option<V>> {
-        Ok(None)
+    pub fn store<K: AsRef<str>, V: Serialize>(&mut self, key: K, value: V) -> Result<()> {
+        let value = bincode::serialize(&value)?;
+        let entry = Entry::new(key.as_ref(), value)?;
+        let current_position = self.data.seek(SeekFrom::Current(0))?;
+        entry.encode(&mut self.data)?; // by_ref does not work for multiple candidate
+        self.index.hm.insert(entry.key, current_position as usize);
+        Ok(())
+    }
+
+    pub fn get<D: DeserializeOwned>(&mut self, key: &str) -> Result<Option<D>> {
+        if let (Some(&offset)) = self.index.hm.get(key) {
+            let current_position = self.data.seek(SeekFrom::Current(0))?;
+            self.data.seek(SeekFrom::Start(offset as u64))?;
+            let entry = Entry::decode(&self.data)?;
+            let value = bincode::deserialize_from(io::Cursor::new(entry.value))?;
+            Ok(Some(value))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+struct Index {
+    hm: HashMap<String, usize>,
+}
+
+impl Index {
+    fn construct_from<R: Read>(mut r: R) -> Result<Self> {
+        let mut hm = HashMap::new();
+        let mut position = 0;
+        let err = loop {
+            if let Err(err) = Entry::decode(r.by_ref()).map(|entry| {
+                let entry_len = entry.len();
+                hm.insert(entry.key, position);
+                position += entry_len;
+            }) {
+                break err;
+            }
+        };
+        if err.is_eof() {
+            Ok(Self { hm })
+        } else {
+            Err(err)
+        }
     }
 }
 
@@ -76,6 +131,39 @@ struct Entry {
 
 impl Entry {
     const HEADER_BYTES: usize = 32 + 16 + 32;
+    const MAX_KEY_LENGTH: usize = u16::max_value() as usize;
+    const MAX_VALUE_BYTES: usize = u32::max_value() as usize;
+
+    fn new<K: Into<String>>(key: K, value: Vec<u8>) -> Result<Self> {
+        let key = key.into();
+        if key.len() > Entry::MAX_KEY_LENGTH {
+            return Err(KvsError::MaxKeyLength);
+        }
+        let key_len = key.len() as u16;
+
+        if value.len() > Entry::MAX_VALUE_BYTES {
+            return Err(KvsError::MaxValueBytes);
+        }
+        let value_len = value.len() as u32;
+
+        // create crc32
+        let mut h = crc32fast::Hasher::new();
+        let mut buff = Vec::with_capacity(6);
+        buff.write_u16::<BE>(key_len)?;
+        buff.write_u32::<BE>(value_len)?;
+        h.update(&buff);
+        h.update(key.as_bytes());
+        h.update(value.as_slice());
+        let checksum = h.finalize();
+
+        Ok(Self {
+            checksum,
+            key_len,
+            value_len,
+            key: key.to_string(),
+            value,
+        })
+    }
 
     fn encode<W: WriteBytesExt>(&self, mut w: W) -> Result<usize> {
         w.write_u32::<BE>(self.checksum)?;
@@ -149,6 +237,15 @@ impl Entries {
         Self(Vec::new())
     }
 
+    fn encode<W: Write>(&self, mut w: W) -> Result<(usize)> {
+        let bytes = self
+            .0
+            .iter()
+            .map(|entry| entry.encode(&mut w))
+            .collect::<Result<Vec<usize>>>()?;
+        Ok(bytes.iter().sum())
+    }
+
     fn decode<R: ReadBytesExt>(mut r: R) -> Result<Self> {
         let mut entries = Entries::new();
         loop {
@@ -180,13 +277,7 @@ mod tests {
 
     #[test]
     fn entry_encode_decode() {
-        let mut entry = Entry {
-            checksum: 999,
-            key_len: 3,
-            value_len: 5,
-            key: "abc".to_string(),
-            value: vec![0x01, 0x02, 0x03, 0x04, 0x05],
-        };
+        let mut entry = Entry::new("abc", vec![0x01, 0x02, 0x03, 0x04, 0x05]).unwrap();
         let mut cursor = io::Cursor::new(vec![]);
 
         assert_eq!(
@@ -200,12 +291,10 @@ mod tests {
     }
 
     #[test]
-    fn entries_decode() {
+    fn entries_encode_decode() {
         let mut cursor = io::Cursor::new(vec![]);
         let entries = make_entries();
-        entries.0.iter().for_each(|entry| {
-            entry.encode(&mut cursor).unwrap();
-        });
+        entries.encode(&mut cursor).unwrap();
         cursor.set_position(0);
 
         let decoded = Entries::decode(&mut cursor).unwrap();
@@ -214,20 +303,23 @@ mod tests {
 
     fn make_entries() -> Entries {
         Entries(vec![
-            Entry {
-                checksum: 111,
-                key_len: 3,
-                value_len: 5,
-                key: "abc".to_string(),
-                value: vec![0x01, 0x02, 0x03, 0x04, 0x05],
-            },
-            Entry {
-                checksum: 222,
-                key_len: 4,
-                value_len: 6,
-                key: "abcd".to_string(),
-                value: vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06],
-            },
+            Entry::new("abc", vec![0x01, 0x02, 0x03, 0x04, 0x05]).unwrap(),
+            Entry::new("abcd", vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06]).unwrap(),
         ])
+    }
+
+    #[test]
+    fn index_construct_from() {
+        let mut cursor = io::Cursor::new(vec![]);
+        let entries = make_entries();
+        entries.encode(&mut cursor).unwrap();
+        cursor.set_position(0);
+
+        let index = Index::construct_from(&mut cursor).unwrap();
+        let mut n = 0;
+        for entry in entries.0.iter() {
+            assert_eq!(Some(&n), index.hm.get(&entry.key));
+            n += entry.len();
+        }
     }
 }
