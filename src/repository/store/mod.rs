@@ -1,2 +1,1 @@
-mod store;
 mod table;
