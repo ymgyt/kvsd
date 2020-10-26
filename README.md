@@ -1,5 +1,4 @@
-# kvs
+# Kvs
 
-## TODO
+Simple Key Value store.
 
-- [ ] logging
