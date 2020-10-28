@@ -10,4 +10,8 @@ edition = "2018"
 tokio = { version = "0.3.1", features = ["rt", "rt-multi-thread", "io-util", "net", "stream", "signal", "fs","sync"]}
 bytes = "0.6"
 tracing = "0.1.21"
+chrono = "0.4.19"
+backtrace = "0.3.53"
 
+[dev-dependencies]
+tokio-test = { version = "0.3.0"}
