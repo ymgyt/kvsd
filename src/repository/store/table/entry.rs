@@ -102,7 +102,9 @@ impl Entry {
     }
 
     // Construct Entry from reader.
-    pub(super) async fn decode_from<R: AsyncReadExt + Unpin>(mut reader: R) -> Result<(usize, Self)> {
+    pub(super) async fn decode_from<R: AsyncReadExt + Unpin>(
+        mut reader: R,
+    ) -> Result<(usize, Self)> {
         // Assuming reader is buffered.
         // calling order is important.
         // We can't like this for eval_order_dependence(https://rust-lang.github.io/rust-clippy/master/index.html#eval_order_dependence)
@@ -242,7 +244,7 @@ mod tests {
             let entry2_offset = index.lookup_offset("key2").unwrap();
             buf.set_position(entry2_offset as u64);
 
-           let (_, decoded) = Entry::decode_from(&mut buf).await.unwrap();
+            let (_, decoded) = Entry::decode_from(&mut buf).await.unwrap();
             assert_eq!(entry2, decoded);
             println!("{:?}", entry2);
             println!("{:?}", decoded);
