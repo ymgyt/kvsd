@@ -1,5 +1,3 @@
-mod entry;
-
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio::sync::mpsc::Receiver;
 
