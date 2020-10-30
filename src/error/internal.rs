@@ -48,6 +48,14 @@ impl Error {
         &self.kind
     }
 
+    pub fn is_eof(&self) -> bool {
+        if let ErrorKind::Io(err) = self.kind() {
+            err.kind().eq(&io::ErrorKind::UnexpectedEof)
+        } else {
+            false
+        }
+    }
+
     fn with_backtrace(kind: ErrorKind) -> Self {
         Self {
             kind,

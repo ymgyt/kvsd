@@ -8,7 +8,7 @@ use crate::protocol::command::{Key, KeyValue, Value};
 
 // Entry represent unit of data that is subject to an operation.
 #[derive(PartialEq, Debug)]
-struct Entry {
+pub(super) struct Entry {
     header: Header,
     body: Body,
 }
@@ -102,7 +102,7 @@ impl Entry {
     }
 
     // Construct Entry from reader.
-    async fn decode_from<R: AsyncReadExt + Unpin>(mut reader: R) -> Result<Self> {
+    pub(super) async fn decode_from<R: AsyncReadExt + Unpin>(mut reader: R) -> Result<(usize, Self)> {
         // Assuming reader is buffered.
         // calling order is important.
         // We can't like this for eval_order_dependence(https://rust-lang.github.io/rust-clippy/master/index.html#eval_order_dependence)
@@ -138,13 +138,20 @@ impl Entry {
             description: e.to_string(),
         })?;
 
-        Ok(Self {
+        let entry = Self {
             header,
             body: Body {
                 key,
                 value: value.into_boxed_slice(),
             },
-        })
+        };
+
+        Ok((entry.encoded_len(), entry))
+    }
+
+    pub(super) fn take_key(&mut self) -> Option<String> {
+        // TODO: use take()
+        Some(self.body.key.clone())
     }
 
     // Assert entry data consistency.
@@ -184,6 +191,7 @@ impl Body {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repository::store::table::index::Index;
     use std::io::Cursor;
 
     #[test]
@@ -209,7 +217,35 @@ mod tests {
             buf.set_position(0);
             let decoded = Entry::decode_from(&mut buf).await.unwrap();
 
-            assert_eq!(entry, decoded);
+            assert_eq!(entry, decoded.1);
+        })
+    }
+
+    #[test]
+    fn construct_index() {
+        tokio_test::block_on(async move {
+            let kv1 = KeyValue::from(("key1", "value1"));
+            let entry1 = Entry::try_from(kv1).unwrap();
+
+            let kv2 = KeyValue::from(("key2", "value2"));
+            let entry2 = Entry::try_from(kv2).unwrap();
+
+            let mut buf = Cursor::new(Vec::new());
+            entry1.encode_to(&mut buf).await.unwrap();
+            entry2.encode_to(&mut buf).await.unwrap();
+
+            buf.set_position(0);
+
+            let index = Index::from_reader(&mut buf).await.unwrap();
+            println!("{:?}", index);
+
+            let entry2_offset = index.lookup_offset("key2").unwrap();
+            buf.set_position(entry2_offset as u64);
+
+           let (_, decoded) = Entry::decode_from(&mut buf).await.unwrap();
+            assert_eq!(entry2, decoded);
+            println!("{:?}", entry2);
+            println!("{:?}", decoded);
         })
     }
 }
