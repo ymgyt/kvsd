@@ -73,7 +73,10 @@ impl Entry {
             value: value.into_boxed_bytes(),
         };
 
-        Ok(Self { header, body })
+        let mut entry = Self { header, body };
+        entry.header.crc_checksum = Some(entry.calc_crc_checksum());
+
+        Ok(entry)
     }
 
     fn try_from_key_value<T>(kv: T) -> Result<Self>
@@ -164,10 +167,28 @@ impl Entry {
         Some(self.body.key.clone())
     }
 
+    fn calc_crc_checksum(&self) -> u32 {
+        let mut h = crc32fast::Hasher::new();
+        h.update(
+            [
+                self.header.key_bytes.to_be_bytes(),
+                self.header.value_bytes.to_be_bytes(),
+                self.header.timestamp_ms.to_be_bytes(),
+            ]
+            .concat()
+            .as_ref(),
+        );
+
+        h.update(self.body.key.as_bytes());
+        h.update(self.body.value.as_ref());
+        h.finalize()
+    }
+
     // Assert entry data consistency.
     fn assert(&self) -> bool {
         self.header.key_bytes == self.body.key.len()
             && self.header.value_bytes == self.body.value.len()
+            && self.header.crc_checksum.unwrap_or(0) == self.calc_crc_checksum()
     }
 
     // Return assuming encoded bytes length.
@@ -223,9 +244,10 @@ mod tests {
             assert_eq!(written, entry.encoded_len());
 
             buf.set_position(0);
-            let decoded = Entry::decode_from(&mut buf).await.unwrap();
+            let (_, decoded) = Entry::decode_from(&mut buf).await.unwrap();
 
-            assert_eq!(entry, decoded.1);
+            assert_eq!(entry, decoded);
+            assert!(decoded.assert());
         })
     }
 
