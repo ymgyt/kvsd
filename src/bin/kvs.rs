@@ -1,5 +1,5 @@
 fn main() {
-    // Install global collector configured based on RUST_LOG env var.
+    // Install global collector configured based on KVS_LOG env var.
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_env("KVS_LOG"))
         .with_target(true)
