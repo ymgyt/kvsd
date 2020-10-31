@@ -162,9 +162,8 @@ impl Entry {
         Ok((entry.encoded_len(), entry))
     }
 
-    pub(super) fn take_key(&mut self) -> Option<String> {
-        // TODO: use take()
-        Some(self.body.key.clone())
+    pub(super) fn take_key(self) -> String {
+        self.body.key
     }
 
     fn calc_crc_checksum(&self) -> u32 {

@@ -17,8 +17,8 @@ impl Index {
         let mut pos: usize = 0;
         loop {
             match Entry::decode_from(&mut reader).await {
-                Ok((n, mut entry)) => {
-                    entries.insert(entry.take_key().expect("entry key already taken"), pos);
+                Ok((n, entry)) => {
+                    entries.insert(entry.take_key(), pos);
                     pos = pos.checked_add(n).unwrap();
                 }
                 Err(err) if err.is_eof() => {

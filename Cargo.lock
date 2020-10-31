@@ -79,6 +79,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crc32fast"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81156fece84ab6a9f2afdb109ce3ae577e42b1228441eded99bd77f627953b1a"
+dependencies = [
+ "cfg-if 1.0.0",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -112,6 +121,7 @@ dependencies = [
  "backtrace",
  "bytes 0.6.0",
  "chrono",
+ "crc32fast",
  "tokio",
  "tokio-test",
  "tracing",
