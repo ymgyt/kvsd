@@ -1,1 +1,1 @@
-mod tcp;
+pub(crate) mod tcp;

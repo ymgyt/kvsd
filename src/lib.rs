@@ -4,6 +4,7 @@ mod client;
 mod repository;
 mod server;
 
+pub mod cli;
 pub mod error;
 pub mod protocol;
 
@@ -18,5 +19,5 @@ pub(crate) mod common {
 
     pub use crate::error::KvsError;
 
-    pub use tracing::info;
+    pub use tracing::{debug, error, info, trace};
 }

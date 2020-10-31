@@ -1,8 +1,15 @@
 use tokio::net::{TcpListener, TcpStream};
 
-use crate::common::{info, Result};
+use crate::common::{error, info};
+use crate::Result;
 
-struct Server {}
+impl Default for Server {
+    fn default() -> Self {
+        Self {}
+    }
+}
+
+pub(crate) struct Server {}
 
 impl Server {
     pub(crate) async fn run(self, listener: TcpListener) -> Result<()> {
@@ -21,14 +28,15 @@ impl Server {
             let mut buff = [0u8; 1024];
             loop {
                 match stream.read(&mut buff).await {
+                    Ok(0) => return,
                     Ok(n) => {
-                        if n == 0 {
+                        if let Err(err) = stream.write_all(&buff[..n]).await {
+                            error!("write error {}", err);
                             return;
-                        }
-                        stream.write_all(&buff[0..n]).await.unwrap();
+                        };
                     }
                     Err(err) => {
-                        eprintln!("err! {}", err);
+                        error!("read error {}", err);
                         return;
                     }
                 }

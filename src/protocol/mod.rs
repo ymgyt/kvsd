@@ -6,6 +6,8 @@ use std::ops::Deref;
 
 use crate::common::{KvsError, Result};
 
+pub const DEFAULT_PORT: &str = "7379";
+
 // Maximum number of bytes in Key.
 // if it's not in ascii, Len  is misleading, so using Bytes explicitly.
 pub const MAX_KYE_BYTES: usize = 1024;
