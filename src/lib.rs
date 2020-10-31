@@ -10,4 +10,6 @@ pub(crate) mod common {
 
     pub(crate) type Error = crate::error::internal::Error;
     pub(crate) type ErrorKind = crate::error::internal::ErrorKind;
+
+    pub use crate::error::KvsError;
 }

@@ -4,6 +4,8 @@ use std::io;
 
 use backtrace::Backtrace;
 
+use crate::common::KvsError;
+
 #[derive(Debug)]
 pub(crate) struct Error {
     kind: ErrorKind,
@@ -13,20 +15,18 @@ pub(crate) struct Error {
 #[derive(Debug)]
 pub(crate) enum ErrorKind {
     Io(io::Error),
-    MaxKeyBytes { key: String, max_bytes: usize },
     EntryDecode { description: String },
+    Kvs(KvsError),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.kind() {
             ErrorKind::Io(err) => err.fmt(f),
-            ErrorKind::MaxKeyBytes { key, max_bytes, .. } => {
-                write!(f, "max key bytes({}) exceeded. key: {:30}", max_bytes, key)
-            }
             ErrorKind::EntryDecode { description, .. } => {
                 write!(f, "entry decode error. {}", description)
             }
+            ErrorKind::Kvs(err) => err.fmt(f),
         }
     }
 }
@@ -40,6 +40,12 @@ impl From<io::Error> for Error {
 impl From<ErrorKind> for Error {
     fn from(kind: ErrorKind) -> Self {
         Error::with_backtrace(kind)
+    }
+}
+
+impl From<KvsError> for Error {
+    fn from(err: KvsError) -> Self {
+        Error::from(ErrorKind::Kvs(err))
     }
 }
 

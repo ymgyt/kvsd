@@ -41,7 +41,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::command::{Command, Key, Set};
+    use crate::protocol::{
+        command::{Command, Set},
+        Key,
+    };
     use tokio::io::AsyncReadExt;
     use tokio::sync::mpsc;
 
@@ -61,7 +64,7 @@ mod tests {
 
                 let (result_tx, result_rx) = tokio::sync::oneshot::channel();
                 tx.send(Command::Set(Set {
-                    key: Key::from("key"),
+                    key: Key::new("key").unwrap(),
                     value: bytes::Bytes::from("hello"),
                     result_sender: result_tx,
                 }))

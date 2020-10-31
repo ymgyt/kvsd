@@ -1,10 +1,10 @@
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 use chrono::Utc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::common::{Error, ErrorKind, Result};
-use crate::protocol::command::{Key, KeyValue, Value};
+use crate::common::{Error, ErrorKind, KvsError, Result};
+use crate::protocol::{Key, KeyValue, Value};
 
 // Entry represent unit of data that is subject to an operation.
 #[derive(PartialEq, Debug)]
@@ -70,10 +70,18 @@ impl Entry {
 
         let body = Body {
             key: key.into_string(),
-            value,
+            value: value.into_boxed_bytes(),
         };
 
         Ok(Self { header, body })
+    }
+
+    fn try_from_key_value<T>(kv: T) -> Result<Self>
+    where
+        T: TryInto<KeyValue, Error = KvsError>,
+    {
+        let kv = kv.try_into()?;
+        Entry::try_from(kv)
     }
 
     // Write binary expression to writer.
@@ -198,24 +206,22 @@ mod tests {
 
     #[test]
     fn from_key_value() {
-        let kv = KeyValue::from(("key", b"hello"));
-        let entry = Entry::try_from(kv).unwrap();
+        let entry = Entry::try_from_key_value(("key", b"hello")).unwrap();
 
         assert_eq!(entry.header.key_bytes, 3);
         assert_eq!(entry.header.value_bytes, 5);
+        assert!(entry.assert())
     }
 
     #[test]
     fn encode_decode() {
         tokio_test::block_on(async move {
-            let kv = KeyValue::from(("key", "hello"));
-            let entry = Entry::try_from(kv).unwrap();
+            let entry = Entry::try_from_key_value(("key", "hello")).unwrap();
 
             let mut buf = Cursor::new(Vec::new());
             let written = entry.encode_to(&mut buf).await.unwrap();
             assert_eq!(written, entry.encoded_len());
 
-            // Seek to start. equivalent to seek(SeekFrom::Start(0)).
             buf.set_position(0);
             let decoded = Entry::decode_from(&mut buf).await.unwrap();
 
@@ -226,11 +232,8 @@ mod tests {
     #[test]
     fn construct_index() {
         tokio_test::block_on(async move {
-            let kv1 = KeyValue::from(("key1", "value1"));
-            let entry1 = Entry::try_from(kv1).unwrap();
-
-            let kv2 = KeyValue::from(("key2", "value2"));
-            let entry2 = Entry::try_from(kv2).unwrap();
+            let entry1 = Entry::try_from_key_value(("kv1", "value1")).unwrap();
+            let entry2 = Entry::try_from_key_value(("key2", "value2")).unwrap();
 
             let mut buf = Cursor::new(Vec::new());
             entry1.encode_to(&mut buf).await.unwrap();
@@ -239,15 +242,12 @@ mod tests {
             buf.set_position(0);
 
             let index = Index::from_reader(&mut buf).await.unwrap();
-            println!("{:?}", index);
 
             let entry2_offset = index.lookup_offset("key2").unwrap();
             buf.set_position(entry2_offset as u64);
 
             let (_, decoded) = Entry::decode_from(&mut buf).await.unwrap();
             assert_eq!(entry2, decoded);
-            println!("{:?}", entry2);
-            println!("{:?}", decoded);
         })
     }
 }

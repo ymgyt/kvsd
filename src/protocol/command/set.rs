@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use tokio::sync::oneshot;
 
-use crate::protocol::command::{CommandError, Key};
+use crate::protocol::{command::CommandError, Key};
 
 #[derive(Debug)]
 pub struct Set {
