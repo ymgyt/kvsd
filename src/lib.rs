@@ -1,9 +1,14 @@
 #![allow(dead_code)]
 
+mod client;
 mod repository;
+mod server;
 
 pub mod error;
 pub mod protocol;
+
+pub use crate::error::KvsError;
+pub type Result<T, E = crate::error::KvsError> = std::result::Result<T, E>;
 
 pub(crate) mod common {
     pub(crate) type Result<T, E = crate::error::internal::Error> = std::result::Result<T, E>;
@@ -12,4 +17,6 @@ pub(crate) mod common {
     pub(crate) type ErrorKind = crate::error::internal::ErrorKind;
 
     pub use crate::error::KvsError;
+
+    pub use tracing::info;
 }

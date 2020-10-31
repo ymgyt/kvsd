@@ -1,12 +1,14 @@
 pub(crate) mod internal;
 
 use std::fmt;
+use std::io;
 
 #[derive(Debug)]
 pub enum KvsError {
     // The Key exceeds the maximum number of bytes specified in the protocol.
     MaxKeyBytes { key: String, max_bytes: usize },
     MaxValueBytes { max_bytes: usize },
+    Io(io::Error),
 }
 
 impl fmt::Display for KvsError {
@@ -18,7 +20,14 @@ impl fmt::Display for KvsError {
             KvsError::MaxValueBytes { max_bytes, .. } => {
                 write!(f, "value exceeds maximum bytes({})", max_bytes)
             }
+            KvsError::Io(err) => err.fmt(f),
         }
+    }
+}
+
+impl From<io::Error> for KvsError {
+    fn from(err: io::Error) -> Self {
+        KvsError::Io(err)
     }
 }
 
