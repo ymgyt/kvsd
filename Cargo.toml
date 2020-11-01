@@ -11,7 +11,7 @@ default = ["cli"]
 cli = ["tracing-subscriber"]
 
 [dependencies]
-tokio = { version = "0.3.2", features = ["rt", "rt-multi-thread", "io-util", "net", "stream", "signal", "fs","sync"] }
+tokio = { version = "0.3.2", features = ["rt", "rt-multi-thread", "io-util", "net", "stream", "signal", "fs","sync", "macros"] }
 bytes = "0.6"
 tracing = "0.1.21"
 chrono = "0.4.19"

@@ -9,6 +9,7 @@ pub enum KvsError {
     MaxKeyBytes { key: String, max_bytes: usize },
     MaxValueBytes { max_bytes: usize },
     Io(io::Error),
+    Internal(Box<dyn std::error::Error + Send + 'static>),
 }
 
 impl fmt::Display for KvsError {
@@ -21,6 +22,7 @@ impl fmt::Display for KvsError {
                 write!(f, "value exceeds maximum bytes({})", max_bytes)
             }
             KvsError::Io(err) => err.fmt(f),
+            KvsError::Internal(err) => err.fmt(f),
         }
     }
 }
@@ -28,6 +30,12 @@ impl fmt::Display for KvsError {
 impl From<io::Error> for KvsError {
     fn from(err: io::Error) -> Self {
         KvsError::Io(err)
+    }
+}
+
+impl From<self::internal::Error> for KvsError {
+    fn from(err: self::internal::Error) -> Self {
+        KvsError::Internal(Box::new(err))
     }
 }
 

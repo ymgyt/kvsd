@@ -19,5 +19,5 @@ pub(crate) mod common {
 
     pub use crate::error::KvsError;
 
-    pub use tracing::{debug, error, info, trace};
+    pub use tracing::{debug, error, info, trace, warn};
 }
