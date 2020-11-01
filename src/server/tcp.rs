@@ -93,7 +93,7 @@ struct MaxConnAwareListener {
     inner: TcpListener,
     max_connections: u32,
     current_connections: Arc<AtomicU32>,
-    // Signal worker completion.
+    // Signal handler completion.
     sender: mpsc::Sender<()>,
 }
 
@@ -107,8 +107,8 @@ impl MaxConnAwareListener {
         let current_connection_clone = Arc::clone(&current_connections);
         tokio::spawn(async move {
             while rx.recv().await.is_some() {
-                trace!("Work done signal received");
-                current_connection_clone.fetch_sub(1, Ordering::Relaxed);
+                let prev = current_connection_clone.fetch_sub(1, Ordering::Relaxed);
+                trace!(curren_conn = prev - 1, "Work done signal received.");
             }
         });
 
@@ -127,8 +127,8 @@ impl MaxConnAwareListener {
             let mut stream = self.inner.accept().await?;
             let current_conns = self.current_connections.load(Ordering::Relaxed) + 1;
             info!(
-                "Accept from {} ({}/{})",
-                stream.1, current_conns, self.max_connections
+                addr = %stream.1, "Accept connection ({}/{})",
+                current_conns, self.max_connections
             );
 
             if current_conns <= self.max_connections {
@@ -147,7 +147,7 @@ impl MaxConnAwareListener {
             )
             .await
             {
-                warn!("Write max conn message {}", err);
+                warn!(%err, "Write max conn message.");
             }
         }
     }
