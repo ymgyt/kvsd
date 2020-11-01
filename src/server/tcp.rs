@@ -6,6 +6,7 @@ use std::sync::{
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
+use tokio::time::{timeout, Duration};
 
 use crate::common::{error, info, trace, warn, Result};
 
@@ -123,7 +124,7 @@ impl MaxConnAwareListener {
         &mut self,
     ) -> std::io::Result<(TcpStream, std::net::SocketAddr, mpsc::Sender<()>)> {
         loop {
-            let stream = self.inner.accept().await?;
+            let mut stream = self.inner.accept().await?;
             let current_conns = self.current_connections.load(Ordering::Relaxed) + 1;
             info!(
                 "Accept from {} ({}/{})",
@@ -134,11 +135,20 @@ impl MaxConnAwareListener {
                 self.current_connections.fetch_add(1, Ordering::Relaxed);
                 return Ok((stream.0, stream.1, self.sender.clone()));
             }
-            // TODO write max connection error
+
             warn!(
                 "Current connections reach max connections({}/{})",
                 current_conns, self.max_connections
             );
+            // Notify client that connection has reached max with timeout.
+            if let Err(err) = timeout(
+                Duration::from_millis(100),
+                stream.0.write_all(b"Reach max connections"),
+            )
+            .await
+            {
+                warn!("Write max conn message {}", err);
+            }
         }
     }
 }
