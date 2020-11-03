@@ -221,7 +221,7 @@ impl Body {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository::store::table::index::Index;
+    use crate::core::store::table::index::Index;
     use std::io::Cursor;
 
     #[test]
