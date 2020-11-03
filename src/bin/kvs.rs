@@ -32,7 +32,7 @@ async fn run_inner() -> kvs::Result<()> {
 
     let m = cli::new().get_matches();
     match m.subcommand() {
-        (cli::ECHO, Some(sm)) => cli::echo::run(sm).await,
+        (cli::PING, Some(sm)) => cli::ping::run(sm).await,
         (cli::SERVER, Some(sm)) => cli::server::run(sm).await,
         (_, _) => unreachable!(),
     }

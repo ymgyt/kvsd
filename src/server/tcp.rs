@@ -3,12 +3,14 @@ use std::sync::{
     Arc,
 };
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio::time::{timeout, Duration};
 
 use crate::common::{error, info, trace, warn, Result};
+use crate::protocol::connection::Connection;
+use crate::protocol::message::{MessageType, Ping};
 
 // Server configuration.
 #[derive(Debug)]
@@ -57,33 +59,40 @@ impl Server {
 }
 
 struct Handler {
-    stream: TcpStream,
+    connection: Connection,
     done: mpsc::Sender<()>,
 }
 
 impl Handler {
     fn new(stream: TcpStream, done: mpsc::Sender<()>) -> Self {
-        Self { stream, done }
+        Self {
+            connection: Connection::new(stream),
+            done,
+        }
     }
 
     async fn handle(mut self) {
-        if let Err(err) = self.echo().await {
-            error!("echo error {}", err);
+        if let Err(err) = self.handle_message().await {
+            error!("Handle message {}", err);
         }
-        if let Err(err) = self.done.send(()).await {
-            error!("send completion signal error {}", err);
-        }
+        self.cleanup().await;
     }
 
-    async fn echo(&mut self) -> Result<()> {
-        let stream = &mut self.stream;
-        let mut buff = [0u8; 1024];
-        loop {
-            match stream.read(&mut buff).await {
-                Ok(0) => return Ok(()),
-                Ok(n) => stream.write_all(&buff[..n]).await?,
-                Err(err) => return Err(err.into()),
+    async fn handle_message(&mut self) -> Result<()> {
+        let message = self.connection.read_message().await?;
+        match message.message_type() {
+            MessageType::Ping => {
+                let ping = Ping::from_reader(std::io::Cursor::new(message.body))?;
+                info!("Ping received! {:?}", ping);
             }
+        }
+
+        Ok(())
+    }
+
+    async fn cleanup(self) {
+        if let Err(err) = self.done.send(()).await {
+            error!("send completion signal error {}", err);
         }
     }
 }

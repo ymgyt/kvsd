@@ -16,6 +16,7 @@ pub(crate) struct Error {
 pub(crate) enum ErrorKind {
     Io(io::Error),
     EntryDecode { description: String },
+    UnknownMessageType { message_type: u8 },
     Kvs(KvsError),
 }
 
@@ -25,6 +26,9 @@ impl fmt::Display for Error {
             ErrorKind::Io(err) => err.fmt(f),
             ErrorKind::EntryDecode { description, .. } => {
                 write!(f, "entry decode error. {}", description)
+            }
+            ErrorKind::UnknownMessageType { message_type, .. } => {
+                write!(f, "unknown message type {}", message_type)
             }
             ErrorKind::Kvs(err) => err.fmt(f),
         }

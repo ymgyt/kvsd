@@ -1,4 +1,4 @@
-pub mod echo;
+pub mod ping;
 pub mod server;
 
 use clap::{App, AppSettings, Arg, ArgMatches};
@@ -6,7 +6,7 @@ use clap::{App, AppSettings, Arg, ArgMatches};
 use crate::cli;
 use crate::protocol;
 
-pub const ECHO: &str = "echo";
+pub const PING: &str = "ping";
 pub const SERVER: &str = "server";
 
 pub(super) const MUST_ARG_HOST: &str = "host";
@@ -30,7 +30,7 @@ pub fn new() -> App<'static, 'static> {
                 .help("Server listening port")
                 .global(true),
         )
-        .subcommand(cli::echo::subcommand())
+        .subcommand(cli::ping::subcommand())
         .subcommand(cli::server::subcommand())
         .settings(&[
             AppSettings::SubcommandRequiredElseHelp,

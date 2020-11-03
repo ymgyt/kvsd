@@ -1,42 +1,27 @@
-use tokio::net::TcpStream;
+use tokio::net::{TcpStream, ToSocketAddrs};
 
-use crate::common::info;
+use crate::protocol::connection::Connection;
+use crate::protocol::message::{Message, Ping};
 use crate::Result;
 
 pub struct Client {
-    stream: TcpStream,
+    connection: Connection,
 }
 
 impl Client {
     pub fn new(stream: impl Into<TcpStream>) -> Self {
         Self {
-            stream: stream.into(),
+            connection: Connection::new(stream.into()),
         }
     }
+    pub async fn from_addr(addr: impl ToSocketAddrs) -> Result<Self> {
+        Ok(Client::new(tokio::net::TcpStream::connect(addr).await?))
+    }
 
-    pub async fn echo(&mut self, message: impl Into<String>) -> Result<()> {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
-        let message = message.into();
-
-        if message.is_empty() {
-            return Ok(());
-        }
-
-        self.stream.write_all(message.as_bytes()).await?;
-
-        let mut buf = [0u8; 256];
-        let mut sum = 0;
-        while sum < message.len() {
-            let n = self.stream.read(&mut buf).await?;
-            if n == 0 {
-                break;
-            }
-
-            sum = sum.saturating_add(n);
-            info!("read {} bytes ({}/{})", n, sum, message.len());
-
-            println!("{}", String::from_utf8_lossy(&buf[..n]));
-        }
+    pub async fn ping(&mut self) -> Result<()> {
+        let ping = Ping::new().record_client_time();
+        let message = Message::new_request(ping)?;
+        self.connection.write_message(message).await?;
 
         Ok(())
     }
