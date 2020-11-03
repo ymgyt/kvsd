@@ -1,13 +1,8 @@
 mod config;
+mod kvs;
+pub(crate) mod request;
 mod store;
 
-use crate::core::config::Config;
-
-// Repository represents top level kvs root directory.
-// it provide kvs api to internet facing servers.
-struct Repository {
-    config: Config,
-    dispatcher: Dispatcher,
-}
-
-struct Dispatcher {}
+pub(crate) use crate::core::config::Config;
+pub(crate) use crate::core::kvs::Builder;
+pub(crate) use crate::core::request::Request;

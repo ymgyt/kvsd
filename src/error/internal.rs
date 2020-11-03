@@ -2,6 +2,9 @@ use std::error;
 use std::fmt;
 use std::io;
 
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::oneshot::error::RecvError as OneshotRecvError;
+
 use backtrace::Backtrace;
 
 use crate::common::KvsError;
@@ -18,6 +21,7 @@ pub(crate) enum ErrorKind {
     EntryDecode { description: String },
     UnknownMessageType { message_type: u8 },
     Kvs(KvsError),
+    Internal(String), // Box<dyn std::error::Error + Send + 'static> does not work :(
 }
 
 impl fmt::Display for Error {
@@ -31,6 +35,7 @@ impl fmt::Display for Error {
                 write!(f, "unknown message type {}", message_type)
             }
             ErrorKind::Kvs(err) => err.fmt(f),
+            ErrorKind::Internal(err) => write!(f, "internal error {}", err),
         }
     }
 }
@@ -50,6 +55,18 @@ impl From<ErrorKind> for Error {
 impl From<KvsError> for Error {
     fn from(err: KvsError) -> Self {
         Error::from(ErrorKind::Kvs(err))
+    }
+}
+
+impl<T> From<SendError<T>> for Error {
+    fn from(err: SendError<T>) -> Self {
+        Error::from(ErrorKind::Internal(err.to_string()))
+    }
+}
+
+impl From<OneshotRecvError> for Error {
+    fn from(err: OneshotRecvError) -> Self {
+        Error::from(ErrorKind::Internal(err.to_string()))
     }
 }
 

@@ -18,11 +18,17 @@ impl Client {
         Ok(Client::new(tokio::net::TcpStream::connect(addr).await?))
     }
 
-    pub async fn ping(&mut self) -> Result<()> {
+    // Return ping latency.
+    pub async fn ping(&mut self) -> Result<chrono::Duration> {
         let ping = Ping::new().record_client_time();
         let message = Message::Ping(ping);
         self.connection.write_message(message).await?;
 
-        Ok(())
+        let message = self.connection.read_message().await?;
+        match message {
+            Message::Ping(ping) => Ok(ping
+                .latency()
+                .expect("client/server timestamp not recorded")),
+        }
     }
 }

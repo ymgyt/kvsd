@@ -1,2 +1,7 @@
-#[allow(dead_code)]
-pub(in crate::core) struct Config {}
+pub(crate) struct Config {}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {}
+    }
+}

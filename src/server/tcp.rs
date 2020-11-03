@@ -9,6 +9,7 @@ use tokio::sync::mpsc;
 use tokio::time::{timeout, Duration};
 
 use crate::common::{error, info, trace, warn, Result};
+use crate::core::{request, Request};
 use crate::protocol::connection::Connection;
 use crate::protocol::message::Message;
 
@@ -45,14 +46,18 @@ impl Server {
         Self { config }
     }
 
-    pub(crate) async fn run(self, listener: TcpListener) -> Result<()> {
+    pub(crate) async fn run(
+        self,
+        listener: TcpListener,
+        request_sender: mpsc::Sender<Request>,
+    ) -> Result<()> {
         info!("Server running. {:?}", self.config);
 
         let mut listener = MaxConnAwareListener::new(listener, self.config.max_tcp_connections);
 
         loop {
             let (socket, _, done) = listener.accept().await?;
-            let handler = Handler::new(socket, done);
+            let handler = Handler::new(socket, done, request_sender.clone());
             tokio::spawn(handler.handle());
         }
     }
@@ -61,13 +66,19 @@ impl Server {
 struct Handler {
     connection: Connection,
     done: mpsc::Sender<()>,
+    request_sender: mpsc::Sender<Request>,
 }
 
 impl Handler {
-    fn new(stream: TcpStream, done: mpsc::Sender<()>) -> Self {
+    fn new(
+        stream: TcpStream,
+        done: mpsc::Sender<()>,
+        request_sender: mpsc::Sender<Request>,
+    ) -> Self {
         Self {
             connection: Connection::new(stream),
             done,
+            request_sender,
         }
     }
 
@@ -81,8 +92,13 @@ impl Handler {
     async fn handle_message(&mut self) -> Result<()> {
         let message = self.connection.read_message().await?;
         match message {
-            Message::Ping(ping) => {
-                info!("Ping received! {:?}", ping);
+            Message::Ping(mut ping) => {
+                // TODO: message <-> request mapping component.
+                let (recv, req) = request::PingRequest::new_request();
+                self.request_sender.send(req).await?;
+                let timestamp = recv.await?;
+                ping.record_server_time(timestamp);
+                self.connection.write_message(Message::Ping(ping)).await?;
             }
         }
 

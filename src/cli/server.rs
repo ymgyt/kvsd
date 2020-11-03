@@ -2,6 +2,7 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 
 use crate::cli::{server_addr, SERVER};
 use crate::common::info;
+use crate::core::{Builder, Config as KvsConfig};
 use crate::server::tcp::{Config, Server};
 use crate::{KvsError, Result};
 
@@ -23,8 +24,19 @@ pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
     let config = Config::default()
         .set_max_tcp_connections(m.value_of(ARG_MAX_CONN).and_then(|s| s.parse().ok()));
     let server = Server::new(config);
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
 
+    let kvs_config = KvsConfig::default();
+    let kvs_builder = Builder::from_config(kvs_config);
+    let kvs = kvs_builder.build()?;
+    let request_sender = kvs.request_channel();
+
+    tokio::spawn(kvs.run());
+
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
     info!("Listening {}", addr);
-    server.run(listener).await.map_err(KvsError::from)
+
+    server
+        .run(listener, request_sender)
+        .await
+        .map_err(KvsError::from)
 }
