@@ -1,10 +1,8 @@
-use std::convert::TryFrom;
-
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use tokio::net::TcpStream;
 
 use crate::common::Result;
-use crate::protocol::message::{Header, Message, MessageType};
+use crate::protocol::message::{Message, MessageType, Ping};
 
 pub struct Connection {
     stream: TcpStream,
@@ -16,17 +14,19 @@ impl Connection {
     }
 
     pub(crate) async fn write_message(&mut self, message: Message) -> Result<()> {
-        Connection::encode_message(&mut self.stream, message).await
+        let mut writer =
+            BufWriter::with_capacity(16 + message.encoded_len() as usize, &mut self.stream);
+        Connection::encode_message(&mut writer, message).await?;
+        Ok(writer.flush().await?)
     }
 
     async fn encode_message<W>(mut writer: W, message: Message) -> Result<()>
     where
         W: AsyncWriteExt + Unpin,
     {
-        writer.write_u8(message.header.message_type as u8).await?;
-        writer.write_u16(message.header.flag.to_u16()).await?;
-        writer.write_u64(message.header.body_bytes as u64).await?;
-        writer.write_all(message.body.as_ref()).await?;
+        writer.write_u8(message.message_type().into()).await?;
+        writer.write_u64(message.encoded_len()).await?;
+        message.encode_to(writer).await?;
 
         Ok(())
     }
@@ -39,19 +39,12 @@ impl Connection {
     where
         R: AsyncReadExt + Unpin,
     {
-        let message_type = reader.read_u8().await?;
-        let flag = reader.read_u16().await?.into();
-        let body_bytes = reader.read_u64().await?;
-
-        let mut buf = Vec::with_capacity(body_bytes as usize);
-        reader.take(body_bytes).read_to_end(buf.as_mut()).await?;
-
-        let header = Header {
-            message_type: MessageType::try_from(message_type)?,
-            flag,
-            body_bytes: body_bytes as usize,
-        };
-
-        Ok(Message::with(header, buf))
+        use std::convert::TryInto;
+        let message_type: MessageType = reader.read_u8().await?.try_into()?;
+        let len = reader.read_u64().await?;
+        let reader = reader.take(len);
+        match message_type {
+            MessageType::Ping => Ok(Message::Ping(Ping::decode_from(reader).await?)),
+        }
     }
 }

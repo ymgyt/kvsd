@@ -20,7 +20,7 @@ impl Client {
 
     pub async fn ping(&mut self) -> Result<()> {
         let ping = Ping::new().record_client_time();
-        let message = Message::new_request(ping)?;
+        let message = Message::Ping(ping);
         self.connection.write_message(message).await?;
 
         Ok(())

@@ -1,64 +1,63 @@
+use chrono::{DateTime, TimeZone, Utc};
+
 use crate::common::Result;
-use crate::protocol::message::{IntoMessage, MessageType};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[derive(Debug)]
 pub(crate) struct Ping {
-    client_timestamp: Option<i64>,
-    server_timestamp: Option<i64>,
+    client_timestamp: Option<DateTime<Utc>>,
+    server_timestamp: Option<DateTime<Utc>>,
 }
 
 impl Ping {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             client_timestamp: None,
             server_timestamp: None,
         }
     }
 
-    pub fn record_client_time(mut self) -> Self {
-        self.client_timestamp = Some(Ping::timestamp());
+    pub(crate) fn record_client_time(mut self) -> Self {
+        self.client_timestamp = Some(Utc::now());
         self
     }
 
-    pub fn timestamp() -> i64 {
-        chrono::Utc::now().timestamp()
+    pub(crate) fn encoded_len(&self) -> u64 {
+        16
     }
 
-    pub(crate) fn from_reader<R>(mut reader: R) -> Result<Self>
+    pub(crate) async fn encode_to<W>(&self, mut writer: W) -> Result<()>
     where
-        R: std::io::Read,
+        W: AsyncWriteExt + Unpin,
     {
-        let mut buf = [0u8; 8];
-        reader.read_exact(&mut buf)?;
+        writer
+            .write_i64(self.client_timestamp.map(|t| t.timestamp()).unwrap_or(0))
+            .await?;
+        writer
+            .write_i64(self.server_timestamp.map(|t| t.timestamp()).unwrap_or(0))
+            .await?;
 
-        let client_timestamp = match i64::from_be_bytes(buf) {
-            0 => None,
-            n => Some(n),
-        };
-        reader.read_exact(&mut buf)?;
-        let server_timestamp = match i64::from_be_bytes(buf) {
-            0 => None,
-            n => Some(n),
-        };
+        Ok(())
+    }
 
-        Ok(Ping {
+    pub(crate) async fn decode_from<R>(mut reader: R) -> Result<Self>
+    where
+        R: AsyncReadExt + Unpin,
+    {
+        let client_timestamp = Ping::parse_timestamp(reader.read_i64().await?);
+        let server_timestamp = Ping::parse_timestamp(reader.read_i64().await?);
+
+        Ok(Self {
             client_timestamp,
             server_timestamp,
         })
     }
-}
 
-impl IntoMessage for Ping {
-    fn message_type(&self) -> MessageType {
-        MessageType::Ping
-    }
-
-    fn into_body(self) -> Result<Vec<u8>> {
-        use std::io::Write;
-        let mut buf = Vec::with_capacity(16);
-        buf.write_all(&self.client_timestamp.unwrap_or(0).to_be_bytes())?;
-        buf.write_all(&self.server_timestamp.unwrap_or(0).to_be_bytes())?;
-
-        Ok(buf)
+    fn parse_timestamp(timestamp: i64) -> Option<DateTime<Utc>> {
+        if timestamp == 0 {
+            None
+        } else {
+            Some(Utc.timestamp(timestamp, 0))
+        }
     }
 }

@@ -10,7 +10,7 @@ use tokio::time::{timeout, Duration};
 
 use crate::common::{error, info, trace, warn, Result};
 use crate::protocol::connection::Connection;
-use crate::protocol::message::{MessageType, Ping};
+use crate::protocol::message::Message;
 
 // Server configuration.
 #[derive(Debug)]
@@ -80,9 +80,8 @@ impl Handler {
 
     async fn handle_message(&mut self) -> Result<()> {
         let message = self.connection.read_message().await?;
-        match message.message_type() {
-            MessageType::Ping => {
-                let ping = Ping::from_reader(std::io::Cursor::new(message.body))?;
+        match message {
+            Message::Ping(ping) => {
                 info!("Ping received! {:?}", ping);
             }
         }
