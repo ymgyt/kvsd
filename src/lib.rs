@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 mod client;
-mod repository;
+mod core;
 mod server;
 
 pub mod cli;
