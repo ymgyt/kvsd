@@ -1,12 +1,12 @@
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::Utc;
 
-use crate::common::Result;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use crate::common::Time;
+use crate::protocol::message::{MessageFrames, MessageType};
 
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
 pub(crate) struct Ping {
-    client_timestamp: Option<DateTime<Utc>>,
-    server_timestamp: Option<DateTime<Utc>>,
+    client_timestamp: Option<Time>,
+    server_timestamp: Option<Time>,
 }
 
 impl Ping {
@@ -24,59 +24,23 @@ impl Ping {
         }
     }
 
-    pub(crate) fn record_client_time(mut self) -> Self {
+    pub(crate) fn record_client_time(&mut self) {
         self.client_timestamp = Some(Utc::now());
-        self
     }
 
-    pub(crate) fn record_server_time(&mut self, time: DateTime<Utc>) {
+    pub(crate) fn record_server_time(&mut self, time: Time) {
         self.server_timestamp = Some(time);
     }
+}
 
-    pub(crate) fn encoded_len(&self) -> u64 {
-        16
-    }
+impl Into<MessageFrames> for Ping {
+    fn into(self) -> MessageFrames {
+        let mut frames = MessageFrames::with_capacity(MessageType::Ping, 2);
 
-    pub(crate) async fn encode_to<W>(&self, mut writer: W) -> Result<()>
-    where
-        W: AsyncWriteExt + Unpin,
-    {
-        writer
-            .write_i64(
-                self.client_timestamp
-                    .map(|t| t.timestamp_nanos())
-                    .unwrap_or(0),
-            )
-            .await?;
-        writer
-            .write_i64(
-                self.server_timestamp
-                    .map(|t| t.timestamp_nanos())
-                    .unwrap_or(0),
-            )
-            .await?;
+        // TODO: impl time framing
+        frames.push_string("dummy");
+        frames.push_string("dummy");
 
-        Ok(())
-    }
-
-    pub(crate) async fn decode_from<R>(mut reader: R) -> Result<Self>
-    where
-        R: AsyncReadExt + Unpin,
-    {
-        let client_timestamp = Ping::parse_timestamp(reader.read_i64().await?);
-        let server_timestamp = Ping::parse_timestamp(reader.read_i64().await?);
-
-        Ok(Self {
-            client_timestamp,
-            server_timestamp,
-        })
-    }
-
-    fn parse_timestamp(timestamp: i64) -> Option<DateTime<Utc>> {
-        if timestamp == 0 {
-            None
-        } else {
-            Some(Utc.timestamp_nanos(timestamp))
-        }
+        frames
     }
 }

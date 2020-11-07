@@ -3,6 +3,7 @@ use std::sync::{
     Arc,
 };
 
+use serde::Deserialize;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
@@ -11,32 +12,77 @@ use tokio::time::{timeout, Duration};
 use crate::common::{error, info, trace, warn, Result};
 use crate::core::{request, Request};
 use crate::protocol::connection::Connection;
-use crate::protocol::message::Message;
+use crate::protocol::message::{Message, Success};
 
 // Server configuration.
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Default)]
 pub(crate) struct Config {
     // Max tcp connections.
-    max_tcp_connections: u32,
+    max_tcp_connections: Option<u32>,
     // Size of buffer allocated per tcp connection.
-    connection_tcp_buffer_size: usize,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            max_tcp_connections: 1024 * 10,
-            connection_tcp_buffer_size: 1024 * 4,
-        }
-    }
+    connection_tcp_buffer_bytes: Option<usize>,
+    // tcp listen host.
+    listen_host: Option<String>,
+    // tcp listen port.
+    listen_port: Option<String>,
 }
 
 impl Config {
-    pub(crate) fn set_max_tcp_connections(mut self, n: Option<u32>) -> Self {
-        if let Some(n) = n {
-            self.max_tcp_connections = std::cmp::max(n, 1);
+    const DEFAULT_MAX_TCP_CONNECTIONS: u32 = 1024 * 10;
+    const DEFAULT_CONNECTION_TCP_BUFFER_BYTES: usize = 1024 * 4;
+    const DEFAULT_LISTEN_HOST: &'static str = "127.0.0.1";
+    const DEFAULT_LISTEN_PORT: &'static str = crate::server::DEFAULT_PORT;
+
+    pub(crate) fn set_max_tcp_connections(&mut self, val: Option<u32>) {
+        if let Some(val) = val {
+            self.max_tcp_connections = Some(std::cmp::max(val, 1));
         }
-        self
+    }
+    pub(crate) fn set_connection_tcp_buffer_bytes(&mut self, val: Option<usize>) {
+        if let Some(val) = val {
+            self.connection_tcp_buffer_bytes = Some(std::cmp::max(val, 1));
+        }
+    }
+    pub(crate) fn set_listen_host(&mut self, val: &mut Option<String>) {
+        if let Some(val) = val.take() {
+            self.listen_host = Some(val)
+        }
+    }
+    pub(crate) fn set_listen_port(&mut self, val: &mut Option<String>) {
+        if let Some(val) = val.take() {
+            self.listen_port = Some(val)
+        }
+    }
+    pub(crate) fn override_merge(&mut self, other: &mut Config) {
+        self.set_max_tcp_connections(other.max_tcp_connections);
+        self.set_connection_tcp_buffer_bytes(other.connection_tcp_buffer_bytes);
+        self.set_listen_host(&mut other.listen_host);
+        self.set_listen_port(&mut other.listen_port);
+    }
+
+    fn max_tcp_connections(&self) -> u32 {
+        match self.max_tcp_connections {
+            Some(val) => val,
+            None => Config::DEFAULT_MAX_TCP_CONNECTIONS,
+        }
+    }
+
+    fn connection_tcp_buffer_bytes(&self) -> usize {
+        match self.connection_tcp_buffer_bytes {
+            Some(val) => val,
+            None => Config::DEFAULT_CONNECTION_TCP_BUFFER_BYTES,
+        }
+    }
+    fn listen_addr(&self) -> String {
+        format!(
+            "{}:{}",
+            self.listen_host
+                .as_deref()
+                .unwrap_or_else(|| Config::DEFAULT_LISTEN_HOST),
+            self.listen_port
+                .as_deref()
+                .unwrap_or_else(|| Config::DEFAULT_LISTEN_PORT),
+        )
     }
 }
 
@@ -50,19 +96,29 @@ impl Server {
         Self { config }
     }
 
-    pub(crate) async fn run(
+    pub(crate) async fn run(self, request_sender: mpsc::Sender<Request>) -> Result<()> {
+        let addr = self.config.listen_addr();
+        info!(%addr, "Listening...");
+
+        let listener = tokio::net::TcpListener::bind(addr).await?;
+
+        self.serve(listener, request_sender).await
+    }
+
+    async fn serve(
         self,
         listener: TcpListener,
         request_sender: mpsc::Sender<Request>,
     ) -> Result<()> {
         info!("Server running. {:?}", self.config);
 
-        let mut listener = MaxConnAwareListener::new(listener, self.config.max_tcp_connections);
+        let mut listener = MaxConnAwareListener::new(listener, self.config.max_tcp_connections());
 
         loop {
             let (socket, _, done) = listener.accept().await?;
 
-            let connection = Connection::new(socket, Some(self.config.connection_tcp_buffer_size));
+            let connection =
+                Connection::new(socket, Some(self.config.connection_tcp_buffer_bytes()));
             let handler = Handler::new(connection, done, request_sender.clone());
 
             tokio::spawn(handler.handle());
@@ -97,20 +153,23 @@ impl Handler {
     }
 
     async fn handle_message(&mut self) -> Result<()> {
-        // let message = self.connection.read_message().await?;
-        // match message {
-        //     Message::Ping(mut ping) => {
-        //         // TODO: message <-> request mapping component.
-        //         let (recv, req) = request::PingRequest::new_request();
-        //         self.request_sender.send(req).await?;
-        //         let timestamp = recv.await?;
-        //         ping.record_server_time(timestamp);
-        //         self.connection.write_message(Message::Ping(ping)).await?;
-        //     }
-        // }
-        //
-        // Ok(())
-        todo!()
+        while let Some(message) = self.connection.read_message().await? {
+            match message {
+                Message::Authenticate(_) => {
+                    self.connection.write_message(Success::new()).await?;
+                }
+                Message::Ping(mut ping) => {
+                    // TODO: message <-> request mapping component.
+                    let (recv, req) = request::PingRequest::new_request();
+                    self.request_sender.send(req).await?;
+                    let timestamp = recv.await?;
+                    ping.record_server_time(timestamp);
+                    self.connection.write_message(ping).await?;
+                }
+                Message::Success(_) => unreachable!(),
+            }
+        }
+        Ok(())
     }
 
     async fn cleanup(self) {

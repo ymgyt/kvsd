@@ -2,6 +2,23 @@
 
 Simple Key Value store.
 
+## Configurations
+
+The order of configuration priority is as follows.(high to low)
+
+- command line flag
+- environment variables
+- configuration file
+- default value
+
+### kvs 
+
+### server
+
+| Key | Default | 
+| --- | ------- |
+| max_tcp_connections | xxx | 
+| connection_tcp_buffer_bytes | xxx |
 
 ## Logging
 

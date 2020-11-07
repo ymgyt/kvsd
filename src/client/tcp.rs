@@ -20,6 +20,9 @@ impl Client {
 
     // Return ping latency.
     pub async fn ping(&mut self) -> Result<chrono::Duration> {
+        let mut ping = Ping::new();
+        ping.record_client_time();
+        self.connection.write_message(ping).await?;
         todo!()
     }
 
@@ -28,6 +31,12 @@ impl Client {
         S1: Into<String>,
         S2: Into<String>,
     {
-        todo!()
+        let authenticate = Authenticate::new(username.into(), password.into());
+        self.connection.write_message(authenticate).await?;
+
+        match self.connection.read_message().await? {
+            Some(Message::Success(_)) => Ok(()),
+            _ => unreachable!(),
+        }
     }
 }

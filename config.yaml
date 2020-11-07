@@ -1,0 +1,8 @@
+server:
+  max_tcp_connections: 10240
+  connection_tcp_buffer_bytes: 4096
+  listen_host: 127.0.0.1
+  listen_port: 7379
+
+kvs:
+  _:

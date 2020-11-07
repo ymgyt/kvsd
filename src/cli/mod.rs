@@ -4,7 +4,7 @@ pub mod server;
 use clap::{App, AppSettings, Arg, ArgMatches};
 
 use crate::cli;
-use crate::protocol;
+use crate::server::DEFAULT_PORT;
 
 pub const PING: &str = "ping";
 pub const SERVER: &str = "server";
@@ -26,7 +26,7 @@ pub fn new() -> App<'static, 'static> {
         .arg(
             Arg::with_name(MUST_ARG_PORT)
                 .takes_value(true)
-                .default_value(&protocol::DEFAULT_PORT)
+                .default_value(&DEFAULT_PORT)
                 .help("Server listening port")
                 .global(true),
         )

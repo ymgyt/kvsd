@@ -29,6 +29,8 @@ pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
         // for now, server disconnects tcp connections every time after it process message.
         // so connects every time.
         let mut client = Client::from_addr(addr.clone()).await?;
+        // TODO: get from user
+        client.authenticate("user", "pass").await?;
         let latency = client.ping().await?;
         println!(
             "ping (latency {}ms) {}/{}",

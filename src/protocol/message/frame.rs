@@ -86,7 +86,6 @@ impl MessageFrames {
     }
 
     fn ensure_prefix_format(src: &mut ByteCursor) -> Result<u64, Error> {
-        println!("ensure_prefix");
         if cursor::get_u8(src)? != frameprefix::MESSAGE_FRAMES {
             return Err(Error::Invalid("message frames prefix expected".into()));
         }
@@ -97,9 +96,8 @@ impl MessageFrames {
 
 impl Frame {
     fn len(&self) -> u64 {
-        match self {
-            _ => 1,
-        }
+        // impl when Frame::Array added
+        1
     }
     fn check(src: &mut ByteCursor) -> Result<(), Error> {
         match cursor::get_u8(src)? {

@@ -6,9 +6,7 @@ use tokio::net::TcpStream;
 
 use crate::common::Result;
 use crate::error::internal::ErrorKind;
-use crate::protocol::message::{
-    frameprefix, Frame, FrameError, Message, MessageFrames, MessageType, Ping, DELIMITER,
-};
+use crate::protocol::message::{frameprefix, Frame, FrameError, Message, MessageFrames, DELIMITER};
 
 pub struct Connection<T = TcpStream> {
     stream: BufWriter<T>,
@@ -59,7 +57,10 @@ where
     }
 
     pub(crate) async fn read_message(&mut self) -> Result<Option<Message>> {
-        todo!()
+        match self.read_message_frames().await? {
+            Some(message_frames) => Ok(Some(Message::from_frames(message_frames)?)),
+            None => Ok(None),
+        }
     }
 
     async fn read_message_frames(&mut self) -> Result<Option<MessageFrames>> {
@@ -113,7 +114,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::message::{self, Message};
+    use crate::protocol::message::{Authenticate,Message};
 
     #[test]
     fn message_frames() {
@@ -122,8 +123,8 @@ mod tests {
             let mut client_conn = Connection::new(client, None);
             let mut server_conn = Connection::new(server, None);
 
-            let messages: Vec<MessageFrames> =
-                vec![message::Authenticate::new("user", "pass").into()];
+            let messages: Vec<Message> =
+                vec![Message::Authenticate(Authenticate::new("user", "pass"))];
             let messages_clone = messages.clone();
 
             let write_handle = tokio::spawn(async move {
@@ -134,7 +135,7 @@ mod tests {
 
             let read_handle = tokio::spawn(async move {
                 for want in messages_clone {
-                    let got = server_conn.read_message_frames().await.unwrap().unwrap();
+                    let got = server_conn.read_message().await.unwrap().unwrap();
                     assert_eq!(want, got);
                 }
             });

@@ -7,7 +7,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError as OneshotRecvError;
 
 use crate::common::KvsError;
-use crate::protocol::message::FrameError;
+use crate::protocol::message::{FrameError, ParseError};
 
 #[derive(Debug)]
 pub(crate) struct Error {
@@ -18,6 +18,7 @@ pub(crate) struct Error {
 #[derive(Debug)]
 pub(crate) enum ErrorKind {
     Io(io::Error),
+    Yaml(serde_yaml::Error),
     EntryDecode { description: String },
     UnknownMessageType { message_type: u8 },
     // Unintentional disconnection.
@@ -31,6 +32,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.kind() {
             ErrorKind::Io(err) => err.fmt(f),
+            ErrorKind::Yaml(err) => err.fmt(f),
             ErrorKind::EntryDecode { description, .. } => {
                 write!(f, "entry decode error. {}", description)
             }
@@ -73,6 +75,17 @@ impl From<FrameError> for Error {
     }
 }
 
+impl From<ParseError> for Error {
+    fn from(err: ParseError) -> Self {
+        match err {
+            ParseError::Other(err) => err,
+            ParseError::EndOfStream => Error::from(ErrorKind::NetworkFraming(
+                "unexpected end of frame stream".into(),
+            )),
+        }
+    }
+}
+
 impl<T> From<SendError<T>> for Error {
     fn from(err: SendError<T>) -> Self {
         Error::from(ErrorKind::Internal(err.to_string()))
@@ -82,6 +95,12 @@ impl<T> From<SendError<T>> for Error {
 impl From<OneshotRecvError> for Error {
     fn from(err: OneshotRecvError) -> Self {
         Error::from(ErrorKind::Internal(err.to_string()))
+    }
+}
+
+impl From<serde_yaml::Error> for Error {
+    fn from(err: serde_yaml::Error) -> Self {
+        Error::from(ErrorKind::Yaml(err))
     }
 }
 

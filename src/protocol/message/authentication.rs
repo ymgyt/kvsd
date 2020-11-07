@@ -1,9 +1,10 @@
-use crate::protocol::message::{MessageFrames, MessageType};
+use crate::common::Result;
+use crate::protocol::message::{MessageFrames, MessageType, Parse};
 
 // Authenticate is a message in which client requests the server
 // to perform authentication process.
 // TODO: impl custom debug for mask credentials.
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
 pub(crate) struct Authenticate {
     username: String,
     password: String,
@@ -19,6 +20,13 @@ impl Authenticate {
             username: username.into(),
             password: password.into(),
         }
+    }
+
+    pub(crate) fn parse_frames(parse: &mut Parse) -> Result<Self> {
+        let username = parse.next_string()?;
+        let password = parse.next_string()?;
+
+        Ok(Authenticate::new(username, password))
     }
 }
 

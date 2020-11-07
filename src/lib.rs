@@ -1,6 +1,8 @@
 #![allow(dead_code)]
+#![allow(clippy::module_inception)]
 
 mod client;
+mod config;
 mod core;
 mod server;
 
