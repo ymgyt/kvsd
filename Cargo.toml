@@ -12,7 +12,7 @@ cli = ["tracing-subscriber"]
 
 [dependencies]
 tokio = { version = "0.3.2", features = ["rt", "rt-multi-thread", "io-util", "net", "stream", "signal", "fs","sync", "macros"] }
-bytes = "0.6"
+bytes = "0.6.0"
 tracing = "0.1.21"
 chrono = "0.4.19"
 backtrace = "0.3.53"
@@ -21,6 +21,7 @@ num_cpus = "1.13.0"
 tracing-subscriber = { version = "0.2.14", optional = true }
 clap = "2.33.3"
 tracing-futures = "0.2.4"
+atoi = "0.3.3"
 
 [dev-dependencies]
 tokio-test = "0.3.0"

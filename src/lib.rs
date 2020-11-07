@@ -19,5 +19,7 @@ pub(crate) mod common {
 
     pub use crate::error::KvsError;
 
+    pub(crate) type Time = chrono::DateTime<chrono::Utc>;
+
     pub use tracing::{debug, error, info, trace, warn};
 }

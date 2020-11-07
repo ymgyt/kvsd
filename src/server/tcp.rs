@@ -16,13 +16,17 @@ use crate::protocol::message::Message;
 // Server configuration.
 #[derive(Debug)]
 pub(crate) struct Config {
+    // Max tcp connections.
     max_tcp_connections: u32,
+    // Size of buffer allocated per tcp connection.
+    connection_tcp_buffer_size: usize,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             max_tcp_connections: 1024 * 10,
+            connection_tcp_buffer_size: 1024 * 4,
         }
     }
 }
@@ -57,7 +61,10 @@ impl Server {
 
         loop {
             let (socket, _, done) = listener.accept().await?;
-            let handler = Handler::new(socket, done, request_sender.clone());
+
+            let connection = Connection::new(socket, Some(self.config.connection_tcp_buffer_size));
+            let handler = Handler::new(connection, done, request_sender.clone());
+
             tokio::spawn(handler.handle());
         }
     }
@@ -71,12 +78,12 @@ struct Handler {
 
 impl Handler {
     fn new(
-        stream: TcpStream,
+        connection: Connection,
         done: mpsc::Sender<()>,
         request_sender: mpsc::Sender<Request>,
     ) -> Self {
         Self {
-            connection: Connection::new(stream),
+            connection,
             done,
             request_sender,
         }
@@ -90,19 +97,20 @@ impl Handler {
     }
 
     async fn handle_message(&mut self) -> Result<()> {
-        let message = self.connection.read_message().await?;
-        match message {
-            Message::Ping(mut ping) => {
-                // TODO: message <-> request mapping component.
-                let (recv, req) = request::PingRequest::new_request();
-                self.request_sender.send(req).await?;
-                let timestamp = recv.await?;
-                ping.record_server_time(timestamp);
-                self.connection.write_message(Message::Ping(ping)).await?;
-            }
-        }
-
-        Ok(())
+        // let message = self.connection.read_message().await?;
+        // match message {
+        //     Message::Ping(mut ping) => {
+        //         // TODO: message <-> request mapping component.
+        //         let (recv, req) = request::PingRequest::new_request();
+        //         self.request_sender.send(req).await?;
+        //         let timestamp = recv.await?;
+        //         ping.record_server_time(timestamp);
+        //         self.connection.write_message(Message::Ping(ping)).await?;
+        //     }
+        // }
+        //
+        // Ok(())
+        todo!()
     }
 
     async fn cleanup(self) {

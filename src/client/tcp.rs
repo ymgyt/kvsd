@@ -1,7 +1,7 @@
 use tokio::net::{TcpStream, ToSocketAddrs};
 
 use crate::protocol::connection::Connection;
-use crate::protocol::message::{Message, Ping};
+use crate::protocol::message::{Authenticate, Message, Ping};
 use crate::Result;
 
 pub struct Client {
@@ -11,7 +11,7 @@ pub struct Client {
 impl Client {
     pub fn new(stream: impl Into<TcpStream>) -> Self {
         Self {
-            connection: Connection::new(stream.into()),
+            connection: Connection::new(stream.into(), Some(1024 * 4)),
         }
     }
     pub async fn from_addr(addr: impl ToSocketAddrs) -> Result<Self> {
@@ -20,15 +20,14 @@ impl Client {
 
     // Return ping latency.
     pub async fn ping(&mut self) -> Result<chrono::Duration> {
-        let ping = Ping::new().record_client_time();
-        let message = Message::Ping(ping);
-        self.connection.write_message(message).await?;
+        todo!()
+    }
 
-        let message = self.connection.read_message().await?;
-        match message {
-            Message::Ping(ping) => Ok(ping
-                .latency()
-                .expect("client/server timestamp not recorded")),
-        }
+    pub async fn authenticate<S1, S2>(&mut self, username: S1, password: S2) -> Result<()>
+    where
+        S1: Into<String>,
+        S2: Into<String>,
+    {
+        todo!()
     }
 }

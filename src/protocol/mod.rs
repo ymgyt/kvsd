@@ -1,5 +1,6 @@
 pub mod command;
 pub(crate) mod connection;
+
 pub(crate) mod message;
 
 use std::convert::TryFrom;

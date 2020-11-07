@@ -2,12 +2,12 @@ use std::error;
 use std::fmt;
 use std::io;
 
+use backtrace::Backtrace;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError as OneshotRecvError;
 
-use backtrace::Backtrace;
-
 use crate::common::KvsError;
+use crate::protocol::message::FrameError;
 
 #[derive(Debug)]
 pub(crate) struct Error {
@@ -20,6 +20,9 @@ pub(crate) enum ErrorKind {
     Io(io::Error),
     EntryDecode { description: String },
     UnknownMessageType { message_type: u8 },
+    // Unintentional disconnection.
+    ConnectionResetByPeer,
+    NetworkFraming(String),
     Kvs(KvsError),
     Internal(String), // Box<dyn std::error::Error + Send + 'static> does not work :(
 }
@@ -34,8 +37,10 @@ impl fmt::Display for Error {
             ErrorKind::UnknownMessageType { message_type, .. } => {
                 write!(f, "unknown message type {}", message_type)
             }
+            ErrorKind::ConnectionResetByPeer => write!(f, "connection reset by peer"),
             ErrorKind::Kvs(err) => err.fmt(f),
             ErrorKind::Internal(err) => write!(f, "internal error {}", err),
+            ErrorKind::NetworkFraming(err) => write!(f, "network framing {}", err),
         }
     }
 }
@@ -55,6 +60,16 @@ impl From<ErrorKind> for Error {
 impl From<KvsError> for Error {
     fn from(err: KvsError) -> Self {
         Error::from(ErrorKind::Kvs(err))
+    }
+}
+
+impl From<FrameError> for Error {
+    fn from(err: FrameError) -> Self {
+        match err {
+            FrameError::Incomplete => Error::from(ErrorKind::NetworkFraming("incomplete".into())),
+            FrameError::Invalid(s) => Error::from(ErrorKind::NetworkFraming(s)),
+            FrameError::Other(err) => err,
+        }
     }
 }
 
@@ -86,7 +101,8 @@ impl Error {
     fn with_backtrace(kind: ErrorKind) -> Self {
         Self {
             kind,
-            backtrace: Some(Backtrace::new()),
+            // backtrace: Some(Backtrace::new()),
+            backtrace: None,
         }
     }
 }
