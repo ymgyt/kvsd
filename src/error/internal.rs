@@ -25,6 +25,7 @@ pub(crate) enum ErrorKind {
     ConnectionResetByPeer,
     NetworkFraming(String),
     Kvs(KvsError),
+    Unauthorized(String),
     Internal(String), // Box<dyn std::error::Error + Send + 'static> does not work :(
 }
 
@@ -40,9 +41,10 @@ impl fmt::Display for Error {
                 write!(f, "unknown message type {}", message_type)
             }
             ErrorKind::ConnectionResetByPeer => write!(f, "connection reset by peer"),
-            ErrorKind::Kvs(err) => err.fmt(f),
-            ErrorKind::Internal(err) => write!(f, "internal error {}", err),
             ErrorKind::NetworkFraming(err) => write!(f, "network framing {}", err),
+            ErrorKind::Kvs(err) => err.fmt(f),
+            ErrorKind::Unauthorized(err) => write!(f, "unauthorized {}", err),
+            ErrorKind::Internal(err) => write!(f, "internal error {}", err),
         }
     }
 }
@@ -117,11 +119,15 @@ impl Error {
         }
     }
 
+    pub fn is_unauthorized(&self) -> bool {
+        matches!(self.kind, ErrorKind::Unauthorized(_))
+    }
+
     fn with_backtrace(kind: ErrorKind) -> Self {
         Self {
             kind,
-            // backtrace: Some(Backtrace::new()),
-            backtrace: None,
+            backtrace: Some(Backtrace::new()),
+            // backtrace: None,
         }
     }
 }

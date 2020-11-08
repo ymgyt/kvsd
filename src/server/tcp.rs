@@ -10,9 +10,9 @@ use tokio::sync::mpsc;
 use tokio::time::{timeout, Duration};
 
 use crate::common::{error, info, trace, warn, Result};
-use crate::core::{request, Request};
+use crate::core::{Principal, UnitOfWork};
 use crate::protocol::connection::Connection;
-use crate::protocol::message::{Message, Success};
+use crate::protocol::message::{Fail, Message, Success};
 
 // Server configuration.
 #[derive(Debug, Deserialize, Default)]
@@ -96,7 +96,7 @@ impl Server {
         Self { config }
     }
 
-    pub(crate) async fn run(self, request_sender: mpsc::Sender<Request>) -> Result<()> {
+    pub(crate) async fn run(self, request_sender: mpsc::Sender<UnitOfWork>) -> Result<()> {
         let addr = self.config.listen_addr();
         info!(%addr, "Listening...");
 
@@ -108,7 +108,7 @@ impl Server {
     async fn serve(
         self,
         listener: TcpListener,
-        request_sender: mpsc::Sender<Request>,
+        request_sender: mpsc::Sender<UnitOfWork>,
     ) -> Result<()> {
         info!("Server running. {:?}", self.config);
 
@@ -127,18 +127,20 @@ impl Server {
 }
 
 struct Handler {
+    principal: Arc<Principal>,
     connection: Connection,
     done: mpsc::Sender<()>,
-    request_sender: mpsc::Sender<Request>,
+    request_sender: mpsc::Sender<UnitOfWork>,
 }
 
 impl Handler {
     fn new(
         connection: Connection,
         done: mpsc::Sender<()>,
-        request_sender: mpsc::Sender<Request>,
+        request_sender: mpsc::Sender<UnitOfWork>,
     ) -> Self {
         Self {
+            principal: Arc::new(Principal::AnonymousUser),
             connection,
             done,
             request_sender,
@@ -154,21 +156,50 @@ impl Handler {
 
     async fn handle_message(&mut self) -> Result<()> {
         while let Some(message) = self.connection.read_message().await? {
+            info!(?message, "Handle message");
             match message {
-                Message::Authenticate(_) => {
-                    self.connection.write_message(Success::new()).await?;
+                Message::Authenticate(auth) => {
+                    let (work, rx) = UnitOfWork::new_authenticate(self.principal.clone(), auth);
+
+                    self.request_sender.send(work).await?;
+
+                    let auth_result = rx.await??;
+                    match auth_result {
+                        Some(principal) => {
+                            self.principal = Arc::new(principal);
+                            self.connection.write_message(Success::new()).await?;
+                        }
+                        None => {
+                            self.connection
+                                .write_message(Fail::new("unauthenticated"))
+                                .await?;
+                        }
+                    }
                 }
                 Message::Ping(mut ping) => {
-                    // TODO: message <-> request mapping component.
-                    let (recv, req) = request::PingRequest::new_request();
-                    self.request_sender.send(req).await?;
-                    let timestamp = recv.await?;
-                    ping.record_server_time(timestamp);
-                    self.connection.write_message(ping).await?;
+                    let (work, rx) = UnitOfWork::new_ping(self.principal.clone());
+
+                    self.request_sender.send(work).await?;
+
+                    let ping_result = rx.await?;
+                    match ping_result {
+                        Ok(time) => {
+                            ping.record_server_time(time);
+                            self.connection.write_message(ping).await?;
+                        }
+                        Err(err) if err.is_unauthorized() => {
+                            self.connection
+                                .write_message(Fail::new("unauthorized ping"))
+                                .await?;
+                        }
+                        _ => unreachable!(),
+                    }
                 }
                 Message::Success(_) => unreachable!(),
+                Message::Fail(_) => unreachable!(),
             }
         }
+        trace!("Handle message complete");
         Ok(())
     }
 

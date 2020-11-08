@@ -50,6 +50,14 @@ where
                 self.stream.write_all(val.as_bytes()).await?;
                 self.stream.write_all(DELIMITER).await?;
             }
+            Frame::Time(val) => {
+                self.stream.write_u8(frameprefix::TIME).await?;
+                self.stream.write_all(val.to_rfc3339().as_bytes()).await?;
+                self.stream.write_all(DELIMITER).await?;
+            }
+            Frame::Null => {
+                self.stream.write_u8(frameprefix::NULL).await?;
+            }
             _ => unreachable!(),
         }
 
@@ -114,7 +122,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::message::{Authenticate,Message};
+    use crate::protocol::message::{Authenticate, Fail, Message, Ping, Success};
 
     #[test]
     fn message_frames() {
@@ -123,8 +131,12 @@ mod tests {
             let mut client_conn = Connection::new(client, None);
             let mut server_conn = Connection::new(server, None);
 
-            let messages: Vec<Message> =
-                vec![Message::Authenticate(Authenticate::new("user", "pass"))];
+            let messages: Vec<Message> = vec![
+                Message::Authenticate(Authenticate::new("user", "pass")),
+                Message::Ping(Ping::new().record_client_time()),
+                Message::Success(Success::new()),
+                Message::Fail(Fail::new("fail message")),
+            ];
             let messages_clone = messages.clone();
 
             let write_handle = tokio::spawn(async move {

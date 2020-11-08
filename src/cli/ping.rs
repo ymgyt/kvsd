@@ -1,7 +1,7 @@
 use clap::{App, Arg, ArgMatches, SubCommand};
 
 use crate::cli::{server_addr, PING};
-use crate::client::tcp::Client;
+use crate::client::tcp::UnauthenticatedClient;
 use crate::Result;
 
 const MUST_ARG_PING_COUNT: &str = "count";
@@ -24,13 +24,11 @@ pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
         .and_then(|n| n.parse().ok())
         .unwrap_or(1);
     let mut current = 1;
+    let client = UnauthenticatedClient::from_addr(addr.clone()).await?;
+    // TODO: get from user
+    let mut client = client.authenticate("rootX", "secret").await?;
 
     while current <= count {
-        // for now, server disconnects tcp connections every time after it process message.
-        // so connects every time.
-        let mut client = Client::from_addr(addr.clone()).await?;
-        // TODO: get from user
-        client.authenticate("user", "pass").await?;
         let latency = client.ping().await?;
         println!(
             "ping (latency {}ms) {}/{}",

@@ -1,8 +1,16 @@
-mod config;
 mod kvs;
-pub(crate) mod request;
+pub(crate) use self::kvs::Builder;
+
+mod config;
+pub(crate) use self::config::{Config, UserEntry};
+
 mod store;
 
-pub(crate) use crate::core::config::Config;
-pub(crate) use crate::core::kvs::Builder;
-pub(crate) use crate::core::request::Request;
+mod principal;
+pub(crate) use self::principal::Principal;
+
+mod uow;
+pub(crate) use self::uow::UnitOfWork;
+
+mod credential;
+pub(crate) use self::credential::{Credential, Password, Provider as CredentialProvider};

@@ -1,13 +1,14 @@
 use std::convert::TryFrom;
 
 use crate::common::{Error, ErrorKind, Result};
-use crate::protocol::message::{Authenticate, MessageFrames, Parse, Ping};
+use crate::protocol::message::{Authenticate, Fail, MessageFrames, Parse, Ping, Success};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MessageType {
     Ping = 1,
     Authenticate = 2,
     Success = 3,
+    Fail = 4,
 }
 
 impl Into<u8> for MessageType {
@@ -23,6 +24,7 @@ impl TryFrom<u8> for MessageType {
             1 => Ok(MessageType::Ping),
             2 => Ok(MessageType::Authenticate),
             3 => Ok(MessageType::Success),
+            4 => Ok(MessageType::Fail),
             _ => Err(Error::from(ErrorKind::UnknownMessageType {
                 message_type: n,
             })),
@@ -30,11 +32,12 @@ impl TryFrom<u8> for MessageType {
     }
 }
 
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Message {
     Ping(Ping),
     Authenticate(Authenticate),
     Success(Success),
+    Fail(Fail),
 }
 
 impl Message {
@@ -48,7 +51,9 @@ impl Message {
             MessageType::Authenticate => {
                 Message::Authenticate(Authenticate::parse_frames(&mut parse)?)
             }
-            _ => unreachable!(),
+            MessageType::Ping => Message::Ping(Ping::parse_frames(&mut parse)?),
+            MessageType::Success => Message::Success(Success::new()),
+            MessageType::Fail => Message::Fail(Fail::parse_frames(&mut parse)?),
         };
 
         Ok(message)
@@ -61,21 +66,7 @@ impl Into<MessageFrames> for Message {
             Message::Ping(m) => m.into(),
             Message::Authenticate(m) => m.into(),
             Message::Success(m) => m.into(),
+            Message::Fail(m) => m.into(),
         }
-    }
-}
-
-#[derive(Debug,Clone,PartialEq)]
-pub(crate) struct Success {}
-
-impl Success {
-    pub(crate) fn new() -> Success {
-        Self {}
-    }
-}
-
-impl Into<MessageFrames> for Success {
-    fn into(self) -> MessageFrames {
-        MessageFrames::with_capacity(MessageType::Success, 0)
     }
 }

@@ -19,6 +19,8 @@ pub(crate) mod frameprefix {
     pub(crate) const MESSAGE_FRAMES: u8 = b'*';
     pub(crate) const MESSAGE_TYPE: u8 = b'#';
     pub(crate) const STRING: u8 = b'+';
+    pub(crate) const TIME: u8 = b'T';
+    pub(crate) const NULL: u8 = b'|';
 }
 
 #[derive(Debug)]
@@ -51,6 +53,15 @@ impl MessageFrames {
 
     pub(crate) fn push_time(&mut self, time: Time) {
         self.0.push(Frame::Time(time));
+    }
+    pub(crate) fn push_time_or_null(&mut self, time: Option<Time>) {
+        match time {
+            Some(t) => self.push_time(t),
+            None => self.push_null(),
+        }
+    }
+    pub(crate) fn push_null(&mut self) {
+        self.0.push(Frame::Null);
     }
 
     pub(crate) fn len(&self) -> u64 {
@@ -109,6 +120,11 @@ impl Frame {
                 cursor::get_line(src)?;
                 Ok(())
             }
+            frameprefix::TIME => {
+                cursor::get_line(src)?;
+                Ok(())
+            }
+            frameprefix::NULL => Ok(()),
             _ => unreachable!(),
         }
     }
@@ -122,6 +138,17 @@ impl Frame {
                 let string = String::from_utf8(line).map_err(|e| Error::Invalid(e.to_string()))?;
                 Ok(Frame::String(string))
             }
+            frameprefix::TIME => {
+                use chrono::{DateTime, Utc};
+                let line = cursor::get_line(src)?.to_vec();
+                let string = String::from_utf8(line).map_err(|e| Error::Invalid(e.to_string()))?;
+                Ok(Frame::Time(
+                    DateTime::parse_from_rfc3339(&string)
+                        .map(|dt| dt.with_timezone(&Utc))
+                        .unwrap(),
+                ))
+            }
+            frameprefix::NULL => Ok(Frame::Null),
             _ => unreachable!(),
         }
     }

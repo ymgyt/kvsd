@@ -1,6 +1,6 @@
 use std::vec;
 
-use crate::common::{self, ErrorKind, Result};
+use crate::common::{self, ErrorKind, Result, Time};
 use crate::protocol::message::{Frame, MessageFrames, MessageType};
 
 pub(crate) struct Parse {
@@ -30,6 +30,14 @@ impl Parse {
         match self.next()? {
             Frame::String(s) => Ok(s),
             frame => Err(format!("parse frame error; expected string, got {:?}", frame).into()),
+        }
+    }
+
+    pub(crate) fn next_time_or_null(&mut self) -> Result<Option<Time>, ParseError> {
+        match self.next()? {
+            Frame::Time(time) => Ok(Some(time)),
+            Frame::Null => Ok(None),
+            frame => Err(format!("unexpected frame. want (time|null) got {:?} ", frame).into()),
         }
     }
 

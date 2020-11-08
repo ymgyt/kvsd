@@ -4,8 +4,14 @@ pub(crate) use authentication::Authenticate;
 mod ping;
 pub(crate) use ping::Ping;
 
+mod success;
+pub(crate) use success::Success;
+
+mod fail;
+pub(crate) use fail::Fail;
+
 mod message;
-pub(crate) use message::{Message, MessageType, Success};
+pub(crate) use message::{Message, MessageType};
 
 mod frame;
 pub(crate) use frame::{frameprefix, Error as FrameError, Frame, MessageFrames};
