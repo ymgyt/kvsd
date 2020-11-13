@@ -1,7 +1,6 @@
 use clap::{App, Arg, ArgMatches, SubCommand};
 
-use crate::cli::{server_addr, PING};
-use crate::client::tcp::UnauthenticatedClient;
+use crate::cli::{authenticate, PING};
 use crate::Result;
 
 const MUST_ARG_PING_COUNT: &str = "count";
@@ -18,15 +17,13 @@ pub(super) fn subcommand() -> App<'static, 'static> {
 }
 
 pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
-    let addr = server_addr(m);
     let count = m
         .value_of(MUST_ARG_PING_COUNT)
         .and_then(|n| n.parse().ok())
         .unwrap_or(1);
     let mut current = 1;
-    let client = UnauthenticatedClient::from_addr(addr.clone()).await?;
-    // TODO: get from user
-    let mut client = client.authenticate("rootX", "secret").await?;
+
+    let mut client = authenticate(m).await?;
 
     while current <= count {
         let latency = client.ping().await?;

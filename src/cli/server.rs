@@ -41,14 +41,14 @@ pub(super) fn subcommand() -> App<'static, 'static> {
         )
         .arg(
             Arg::with_name(ARG_HOST)
-                .long("host")
+                .long("bind-host")
                 .takes_value(true)
                 .env("KVS_SERVER_HOST")
                 .help("Tcp binding address host(ex 0.0.0.0, localhost)"),
         )
         .arg(
             Arg::with_name(ARG_PORT)
-                .long("port")
+                .long("bind-port")
                 .takes_value(true)
                 .env("KVS_SERVER_PORT")
                 .help("Tcp binding address port"),
