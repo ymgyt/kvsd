@@ -3,8 +3,9 @@ use std::io::{self, Cursor};
 use bytes::{Buf, BytesMut};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufWriter};
 use tokio::net::TcpStream;
+use tokio::time::Duration;
 
-use crate::common::Result;
+use crate::common::{Error, Result};
 use crate::error::internal::ErrorKind;
 use crate::protocol::message::{frameprefix, Frame, FrameError, Message, MessageFrames, DELIMITER};
 
@@ -62,6 +63,16 @@ where
         }
 
         Ok(())
+    }
+
+    pub(crate) async fn read_message_with_timeout(
+        &mut self,
+        duration: Duration,
+    ) -> Result<Option<Message>> {
+        match tokio::time::timeout(duration, self.read_message()).await {
+            Ok(read_result) => read_result,
+            Err(elapsed) => Err(Error::from(elapsed)),
+        }
     }
 
     pub(crate) async fn read_message(&mut self) -> Result<Option<Message>> {

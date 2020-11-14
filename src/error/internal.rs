@@ -5,6 +5,7 @@ use std::io;
 use backtrace::Backtrace;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError as OneshotRecvError;
+use tokio::time::error::Elapsed;
 
 use crate::common::KvsError;
 use crate::protocol::message::{FrameError, ParseError};
@@ -77,6 +78,14 @@ impl From<FrameError> for Error {
     }
 }
 
+impl From<Elapsed> for Error {
+    fn from(_: Elapsed) -> Self {
+        Error::from(ErrorKind::Io(std::io::Error::from(
+            std::io::ErrorKind::TimedOut,
+        )))
+    }
+}
+
 impl From<ParseError> for Error {
     fn from(err: ParseError) -> Self {
         match err {
@@ -121,6 +130,14 @@ impl Error {
 
     pub fn is_unauthorized(&self) -> bool {
         matches!(self.kind, ErrorKind::Unauthorized(_))
+    }
+
+    pub fn is_timeout(&self) -> bool {
+        if let ErrorKind::Io(err) = self.kind() {
+            err.kind().eq(&io::ErrorKind::TimedOut)
+        } else {
+            false
+        }
     }
 
     fn with_backtrace(kind: ErrorKind) -> Self {

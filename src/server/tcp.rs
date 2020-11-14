@@ -21,6 +21,8 @@ pub(crate) struct Config {
     max_tcp_connections: Option<u32>,
     // Size of buffer allocated per tcp connection.
     connection_tcp_buffer_bytes: Option<usize>,
+    // Timeout duration for reading authenticate message.
+    authenticate_timeout_milliseconds: Option<u64>,
     // tcp listen host.
     listen_host: Option<String>,
     // tcp listen port.
@@ -30,6 +32,7 @@ pub(crate) struct Config {
 impl Config {
     const DEFAULT_MAX_TCP_CONNECTIONS: u32 = 1024 * 10;
     const DEFAULT_CONNECTION_TCP_BUFFER_BYTES: usize = 1024 * 4;
+    const DEFAULT_AUTHENTICATE_TIMEOUT_MILLISECONDS: u64 = 300;
     const DEFAULT_LISTEN_HOST: &'static str = "127.0.0.1";
     const DEFAULT_LISTEN_PORT: &'static str = crate::server::DEFAULT_PORT;
 
@@ -41,6 +44,11 @@ impl Config {
     pub(crate) fn set_connection_tcp_buffer_bytes(&mut self, val: Option<usize>) {
         if let Some(val) = val {
             self.connection_tcp_buffer_bytes = Some(std::cmp::max(val, 1));
+        }
+    }
+    pub(crate) fn set_authenticate_timeout_milliseconds(&mut self, val: Option<u64>) {
+        if let Some(val) = val {
+            self.authenticate_timeout_milliseconds = Some(std::cmp::max(val, 10));
         }
     }
     pub(crate) fn set_listen_host(&mut self, val: &mut Option<String>) {
@@ -56,6 +64,7 @@ impl Config {
     pub(crate) fn override_merge(&mut self, other: &mut Config) {
         self.set_max_tcp_connections(other.max_tcp_connections);
         self.set_connection_tcp_buffer_bytes(other.connection_tcp_buffer_bytes);
+        self.set_authenticate_timeout_milliseconds(other.authenticate_timeout_milliseconds);
         self.set_listen_host(&mut other.listen_host);
         self.set_listen_port(&mut other.listen_port);
     }
@@ -73,6 +82,14 @@ impl Config {
             None => Config::DEFAULT_CONNECTION_TCP_BUFFER_BYTES,
         }
     }
+
+    fn authenticate_timeout(&self) -> Duration {
+        Duration::from_millis(
+            self.authenticate_timeout_milliseconds
+                .unwrap_or(Config::DEFAULT_AUTHENTICATE_TIMEOUT_MILLISECONDS),
+        )
+    }
+
     fn listen_addr(&self) -> String {
         format!(
             "{}:{}",
@@ -89,6 +106,7 @@ impl Config {
 type ShutdownSignal = ();
 type ShutdownCompleteSignal = ();
 
+// Handle graceful shutdown.
 struct GracefulShutdown {
     notify_shutdown: broadcast::Sender<ShutdownSignal>,
     shutdown_complete_tx: mpsc::Sender<ShutdownCompleteSignal>,
@@ -107,6 +125,7 @@ impl GracefulShutdown {
         }
     }
 
+    // Notify handlers of the shutdown and wait for it to be completed.
     async fn shutdown(mut self) {
         // Notify shutdown to all handler.
         drop(self.notify_shutdown);
@@ -182,9 +201,12 @@ impl Server {
             let handler = Handler::new(
                 connection,
                 request_sender.clone(),
-                Shutdown::new(self.graceful_shutdown.notify_shutdown.subscribe()),
-                self.graceful_shutdown.shutdown_complete_tx.clone(),
+                ShutdownSubscriber::new(
+                    self.graceful_shutdown.notify_shutdown.subscribe(),
+                    self.graceful_shutdown.shutdown_complete_tx.clone(),
+                ),
                 listener.max_connections.clone(),
+                self.config.authenticate_timeout(),
             )
             .with_socket_addr(addr);
 
@@ -198,28 +220,27 @@ struct Handler {
     remote_addr: Option<std::net::SocketAddr>,
     connection: Connection,
     request_sender: mpsc::Sender<UnitOfWork>,
-    shutdown: Shutdown,
-    // Send shutdown complete signal by dropping.
-    _shutdown_complete: mpsc::Sender<()>,
+    shutdown: ShutdownSubscriber,
     max_connections: Arc<Semaphore>,
+    authenticate_timeout: Duration,
 }
 
 impl Handler {
     fn new(
         connection: Connection,
         request_sender: mpsc::Sender<UnitOfWork>,
-        shutdown: Shutdown,
-        shutdown_complete_tx: mpsc::Sender<()>,
+        shutdown: ShutdownSubscriber,
         max_connections: Arc<Semaphore>,
+        authenticate_timeout: Duration,
     ) -> Self {
         Self {
             principal: Arc::new(Principal::AnonymousUser),
             connection,
-            request_sender,
             remote_addr: None,
+            request_sender,
             shutdown,
-            _shutdown_complete: shutdown_complete_tx,
             max_connections,
+            authenticate_timeout,
         }
     }
 
@@ -230,55 +251,51 @@ impl Handler {
 
     async fn handle(mut self) {
         match self.authenticate().await {
+            // Successfully client authenticated.
             Ok(true) => {
                 if let Err(err) = self.handle_message().await {
                     error!(?self.remote_addr, "Handle message {}", err);
                 }
             }
+            // Authentication failed, do nothing, just close connection.
             Ok(false) => (),
+            Err(err) if err.is_timeout() => warn!("authentication timeout {}", err),
             Err(err) => error!("{}", err),
         }
     }
 
     async fn authenticate(&mut self) -> Result<bool> {
-        match timeout(Duration::from_millis(500), self.connection.read_message()).await {
-            Ok(result) => match result {
-                Ok(message) => match message {
-                    Some(Message::Authenticate(auth)) => {
-                        let (work, rx) =
-                            UnitOfWork::new_authenticate(self.principal.clone(), auth.clone());
+        match self
+            .connection
+            .read_message_with_timeout(self.authenticate_timeout)
+            .await?
+        {
+            Some(Message::Authenticate(auth)) => {
+                let (work, rx) = UnitOfWork::new_authenticate(self.principal.clone(), auth.clone());
 
-                        self.request_sender.send(work).await?;
+                self.request_sender.send(work).await?;
 
-                        let auth_result = rx.await??;
-                        match auth_result {
-                            Some(principal) => {
-                                self.principal = Arc::new(principal);
-                                self.connection.write_message(Success::new()).await?;
-                                Ok(true)
-                            }
-                            None => {
-                                info!(addr=?self.remote_addr, "unauthenticated {:?}", auth);
-                                self.connection
-                                    .write_message(Fail::from(FailCode::Unauthenticated))
-                                    .await?;
-                                Ok(false)
-                            }
-                        }
+                let auth_result = rx.await??;
+                match auth_result {
+                    Some(principal) => {
+                        self.principal = Arc::new(principal);
+                        self.connection.write_message(Success::new()).await?;
+                        Ok(true)
                     }
-                    Some(msg) => {
-                        warn!("unexpected message {:?}", msg);
+                    None => {
+                        info!(addr=?self.remote_addr, "unauthenticated {:?}", auth);
+                        self.connection
+                            .write_message(Fail::from(FailCode::Unauthenticated))
+                            .await?;
                         Ok(false)
                     }
-                    None => Ok(false),
-                },
-                Err(err) => Err(err),
-            },
-            // read timeout
-            Err(elapsed) => {
-                warn!("authenticate timeout({})", elapsed);
+                }
+            }
+            Some(msg) => {
+                warn!("unexpected message {:?}", msg);
                 Ok(false)
             }
+            None => Ok(false),
         }
     }
 
@@ -418,16 +435,22 @@ impl MaxConnAwareListener {
     }
 }
 
-struct Shutdown {
+struct ShutdownSubscriber {
     shutdown: bool,
     notify: broadcast::Receiver<ShutdownSignal>,
+    // Notify completing shutdown process by dropping.
+    _complete_tx: mpsc::Sender<ShutdownCompleteSignal>,
 }
 
-impl Shutdown {
-    fn new(notify: broadcast::Receiver<ShutdownSignal>) -> Self {
+impl ShutdownSubscriber {
+    fn new(
+        notify: broadcast::Receiver<ShutdownSignal>,
+        complete_tx: mpsc::Sender<ShutdownCompleteSignal>,
+    ) -> Self {
         Self {
             shutdown: false,
             notify,
+            _complete_tx: complete_tx,
         }
     }
 

@@ -9,6 +9,7 @@ use crate::{KvsError, Result};
 
 const ARG_MAX_CONN: &str = "server_max_connection";
 const ARG_CONNECTION_TCP_BUFFER_BYTES: &str = "server_connection_tcp_buffer_bytes";
+const ARG_AUTHENTICATE_TIMEOUT_MILLISECONDS: &str = "server_authenticate_timeout_milliseconds";
 const ARG_CONFIG_PATH: &str = "server_config_path";
 const ARG_HOST: &str = "server_host";
 const ARG_PORT: &str = "server_port";
@@ -29,6 +30,13 @@ pub(super) fn subcommand() -> App<'static, 'static> {
                 .takes_value(true)
                 .env("KVS_SERVER_CONNECTION_TCP_BUFFER_BYTES")
                 .help("Buffer bytes assigned to each tcp connection"),
+        )
+        .arg(
+            Arg::with_name(ARG_AUTHENTICATE_TIMEOUT_MILLISECONDS)
+                .long("authenticate-timeout-milliseconds")
+                .takes_value(true)
+                .env("KVS_SERVER_AUTHENTICATE_TIMEOUT_MILLISECONDS")
+                .help("Authenticate timeout."),
         )
         .arg(
             Arg::with_name(ARG_CONFIG_PATH)
@@ -78,6 +86,10 @@ fn read_server_config(m: &ArgMatches<'_>) -> ServerConfig {
     config.set_max_tcp_connections(m.value_of(ARG_MAX_CONN).and_then(|s| s.parse().ok()));
     config.set_connection_tcp_buffer_bytes(
         m.value_of(ARG_CONNECTION_TCP_BUFFER_BYTES)
+            .and_then(|s| s.parse().ok()),
+    );
+    config.set_authenticate_timeout_milliseconds(
+        m.value_of(ARG_AUTHENTICATE_TIMEOUT_MILLISECONDS)
             .and_then(|s| s.parse().ok()),
     );
     config.set_listen_host(&mut m.value_of(ARG_HOST).map(String::from));
