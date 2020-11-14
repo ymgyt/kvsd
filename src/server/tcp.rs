@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc,
@@ -87,24 +86,50 @@ impl Config {
     }
 }
 
+type ShutdownSignal = ();
+type ShutdownCompleteSignal = ();
+
+struct GracefulShutdown {
+    notify_shutdown: broadcast::Sender<ShutdownSignal>,
+    shutdown_complete_tx: mpsc::Sender<ShutdownCompleteSignal>,
+    shutdown_complete_rx: mpsc::Receiver<ShutdownCompleteSignal>,
+}
+
+impl GracefulShutdown {
+    fn new() -> Self {
+        let (notify_shutdown, _) = broadcast::channel(1);
+        let (shutdown_complete_tx, shutdown_complete_rx) = mpsc::channel(1);
+
+        Self {
+            notify_shutdown,
+            shutdown_complete_tx,
+            shutdown_complete_rx,
+        }
+    }
+
+    async fn shutdown(mut self) {
+        // Notify shutdown to all handler.
+        drop(self.notify_shutdown);
+
+        // Drop final Sender so the Receiver below can complete.
+        drop(self.shutdown_complete_tx);
+
+        // Wait for all handler to finish.
+        let _ = self.shutdown_complete_rx.recv().await;
+    }
+}
+
 pub(crate) struct Server {
     config: Config,
-    notify_shutdown: broadcast::Sender<()>,
-    shutdown_complete_tx: mpsc::Sender<()>,
-    shutdown_complete_rx: mpsc::Receiver<()>,
+    graceful_shutdown: GracefulShutdown,
 }
 
 impl Server {
     // Construct Server from config.
     pub(crate) fn new(config: Config) -> Self {
-        let (notify_shutdown, _) = broadcast::channel(1);
-        let (shutdown_complete_tx, shutdown_complete_rx) = mpsc::channel(1);
-
         Self {
             config,
-            notify_shutdown,
-            shutdown_complete_tx,
-            shutdown_complete_rx,
+            graceful_shutdown: GracefulShutdown::new(),
         }
     }
 
@@ -126,24 +151,12 @@ impl Server {
             }
         }
 
-        let Server {
-            mut shutdown_complete_rx,
-            shutdown_complete_tx,
-            notify_shutdown,
-            ..
-        } = self;
-
         info!("Notify shutdown to all handlers");
-        // Notify shutdown to all handler.
-        drop(notify_shutdown);
 
-        // Drop final Sender so the Receiver below can complete.
-        drop(shutdown_complete_tx);
+        self.graceful_shutdown.shutdown().await;
 
-        // Wait for all handler to finish.
-        let _ = shutdown_complete_rx.recv().await;
+        info!("Shutdown successfully completed");
 
-        info!("shutdown successfully completed");
         Ok(())
     }
 
@@ -154,19 +167,24 @@ impl Server {
     ) -> Result<()> {
         info!("Server running. {:?}", self.config);
 
-        let mut listener = MaxConnAwareListener::new(listener, self.config.max_tcp_connections());
+        let mut listener = SemaphoreListener::new(listener, self.config.max_tcp_connections());
 
         loop {
-            let (socket, addr, done) = listener.accept().await?;
+            let (socket, addr) = listener.accept().await?;
+            info!(
+                available = listener.max_connections.available_permits(),
+                "Connection accepted"
+            );
 
             let connection =
                 Connection::new(socket, Some(self.config.connection_tcp_buffer_bytes()));
+
             let handler = Handler::new(
                 connection,
-                done,
                 request_sender.clone(),
-                Shutdown::new(self.notify_shutdown.subscribe()),
-                self.shutdown_complete_tx.clone(),
+                Shutdown::new(self.graceful_shutdown.notify_shutdown.subscribe()),
+                self.graceful_shutdown.shutdown_complete_tx.clone(),
+                listener.max_connections.clone(),
             )
             .with_socket_addr(addr);
 
@@ -177,31 +195,31 @@ impl Server {
 
 struct Handler {
     principal: Arc<Principal>,
-    connection: Connection,
-    done: mpsc::Sender<()>,
-    request_sender: mpsc::Sender<UnitOfWork>,
     remote_addr: Option<std::net::SocketAddr>,
+    connection: Connection,
+    request_sender: mpsc::Sender<UnitOfWork>,
     shutdown: Shutdown,
     // Send shutdown complete signal by dropping.
     _shutdown_complete: mpsc::Sender<()>,
+    max_connections: Arc<Semaphore>,
 }
 
 impl Handler {
     fn new(
         connection: Connection,
-        done: mpsc::Sender<()>,
         request_sender: mpsc::Sender<UnitOfWork>,
         shutdown: Shutdown,
         shutdown_complete_tx: mpsc::Sender<()>,
+        max_connections: Arc<Semaphore>,
     ) -> Self {
         Self {
             principal: Arc::new(Principal::AnonymousUser),
             connection,
-            done,
             request_sender,
             remote_addr: None,
             shutdown,
             _shutdown_complete: shutdown_complete_tx,
+            max_connections,
         }
     }
 
@@ -220,7 +238,6 @@ impl Handler {
             Ok(false) => (),
             Err(err) => error!("{}", err),
         }
-        self.cleanup().await;
     }
 
     async fn authenticate(&mut self) -> Result<bool> {
@@ -309,11 +326,30 @@ impl Handler {
 
         Ok(())
     }
+}
 
-    async fn cleanup(self) {
-        if let Err(err) = self.done.send(()).await {
-            error!("send completion signal error {}", err);
+impl Drop for Handler {
+    fn drop(&mut self) {
+        self.max_connections.add_permits(1);
+    }
+}
+
+struct SemaphoreListener {
+    inner: TcpListener,
+    max_connections: Arc<Semaphore>,
+}
+
+impl SemaphoreListener {
+    fn new(listener: TcpListener, max_connections: u32) -> Self {
+        Self {
+            inner: listener,
+            max_connections: Arc::new(Semaphore::new(max_connections as usize)),
         }
+    }
+
+    async fn accept(&mut self) -> std::io::Result<(TcpStream, std::net::SocketAddr)> {
+        self.max_connections.acquire().await.forget();
+        self.inner.accept().await
     }
 }
 
@@ -381,8 +417,6 @@ impl MaxConnAwareListener {
         }
     }
 }
-
-type ShutdownSignal = ();
 
 struct Shutdown {
     shutdown: bool,

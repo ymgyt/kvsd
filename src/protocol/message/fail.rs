@@ -16,7 +16,9 @@ pub(crate) enum FailCode {
 
 impl fmt::Display for FailCode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}",
+        write!(
+            f,
+            "{}",
             match self {
                 FailCode::Undefined => UNDEFINED,
                 FailCode::Unauthenticated => UNAUTHENTICATED,
