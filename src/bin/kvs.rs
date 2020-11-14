@@ -22,8 +22,17 @@ fn main() {
 
 async fn run() {
     if let Err(err) = run_inner().await {
-        eprintln!("{}", err);
-        std::process::exit(1);
+        let code = match err {
+            kvs::KvsError::Unauthenticated => {
+                eprintln!("unauthenticated");
+                2
+            }
+            _ => {
+                eprintln!("{}", err);
+                1
+            }
+        };
+        std::process::exit(code);
     };
 }
 

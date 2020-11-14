@@ -9,6 +9,7 @@ pub enum KvsError {
     MaxKeyBytes { key: String, max_bytes: usize },
     MaxValueBytes { max_bytes: usize },
     Io(io::Error),
+    Unauthenticated,
     Internal(Box<dyn std::error::Error + Send + Sync>),
 }
 
@@ -22,6 +23,7 @@ impl fmt::Display for KvsError {
                 write!(f, "value exceeds maximum bytes({})", max_bytes)
             }
             KvsError::Io(err) => err.fmt(f),
+            KvsError::Unauthenticated => write!(f, "unauthenticated"),
             KvsError::Internal(err) => err.fmt(f),
         }
     }

@@ -34,6 +34,7 @@ impl UnauthenticatedClient {
         self.client.connection.write_message(authenticate).await?;
         match self.client.connection.read_message().await? {
             Some(Message::Success(_)) => Ok(self.client),
+            Some(Message::Fail(_)) => Err(KvsError::Unauthenticated),
             // format!(..).into() does not work :(
             msg => Err(KvsError::Internal(
                 Box::<dyn std::error::Error + Send + Sync>::from(format!(

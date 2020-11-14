@@ -115,11 +115,12 @@ impl Server {
         let mut listener = MaxConnAwareListener::new(listener, self.config.max_tcp_connections());
 
         loop {
-            let (socket, _, done) = listener.accept().await?;
+            let (socket, addr, done) = listener.accept().await?;
 
             let connection =
                 Connection::new(socket, Some(self.config.connection_tcp_buffer_bytes()));
-            let handler = Handler::new(connection, done, request_sender.clone());
+            let handler =
+                Handler::new(connection, done, request_sender.clone()).with_socket_addr(addr);
 
             tokio::spawn(handler.handle());
         }
@@ -131,6 +132,7 @@ struct Handler {
     connection: Connection,
     done: mpsc::Sender<()>,
     request_sender: mpsc::Sender<UnitOfWork>,
+    remote_addr: Option<std::net::SocketAddr>,
 }
 
 impl Handler {
@@ -144,38 +146,74 @@ impl Handler {
             connection,
             done,
             request_sender,
+            remote_addr: None,
         }
     }
 
+    fn with_socket_addr(mut self, addr: std::net::SocketAddr) -> Self {
+        self.remote_addr = Some(addr);
+        self
+    }
+
     async fn handle(mut self) {
-        if let Err(err) = self.handle_message().await {
-            error!("Handle message {}", err);
+        match self.authenticate().await {
+            Ok(true) => {
+                if let Err(err) = self.handle_message().await {
+                    error!(?self.remote_addr, "Handle message {}", err);
+                }
+            }
+            Ok(false) => (),
+            Err(err) => error!("{}", err),
         }
         self.cleanup().await;
+    }
+
+    async fn authenticate(&mut self) -> Result<bool> {
+        match timeout(Duration::from_millis(500), self.connection.read_message()).await {
+            Ok(result) => match result {
+                Ok(message) => match message {
+                    Some(Message::Authenticate(auth)) => {
+                        let (work, rx) =
+                            UnitOfWork::new_authenticate(self.principal.clone(), auth.clone());
+
+                        self.request_sender.send(work).await?;
+
+                        let auth_result = rx.await??;
+                        match auth_result {
+                            Some(principal) => {
+                                self.principal = Arc::new(principal);
+                                self.connection.write_message(Success::new()).await?;
+                                Ok(true)
+                            }
+                            None => {
+                                info!(addr=?self.remote_addr, "unauthenticated {:?}", auth);
+                                self.connection
+                                    .write_message(Fail::new("unauthenticated"))
+                                    .await?;
+                                Ok(false)
+                            }
+                        }
+                    }
+                    Some(msg) => {
+                        warn!("unexpected message {:?}", msg);
+                        Ok(false)
+                    }
+                    None => Ok(false),
+                },
+                Err(err) => Err(err),
+            },
+            // read timeout
+            Err(elapsed) => {
+                warn!("authenticate timeout({})", elapsed);
+                Ok(false)
+            }
+        }
     }
 
     async fn handle_message(&mut self) -> Result<()> {
         while let Some(message) = self.connection.read_message().await? {
             info!(?message, "Handle message");
             match message {
-                Message::Authenticate(auth) => {
-                    let (work, rx) = UnitOfWork::new_authenticate(self.principal.clone(), auth);
-
-                    self.request_sender.send(work).await?;
-
-                    let auth_result = rx.await??;
-                    match auth_result {
-                        Some(principal) => {
-                            self.principal = Arc::new(principal);
-                            self.connection.write_message(Success::new()).await?;
-                        }
-                        None => {
-                            self.connection
-                                .write_message(Fail::new("unauthenticated"))
-                                .await?;
-                        }
-                    }
-                }
                 Message::Ping(mut ping) => {
                     let (work, rx) = UnitOfWork::new_ping(self.principal.clone());
 
@@ -195,6 +233,7 @@ impl Handler {
                         _ => unreachable!(),
                     }
                 }
+                Message::Authenticate(_) => unreachable!(),
                 Message::Success(_) => unreachable!(),
                 Message::Fail(_) => unreachable!(),
             }
