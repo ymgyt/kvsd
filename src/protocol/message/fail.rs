@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::common::Result;
 use crate::protocol::message::{MessageFrames, MessageType, Parse};
 
@@ -12,13 +14,15 @@ pub(crate) enum FailCode {
     UnexpectedMessage,
 }
 
-impl FailCode {
-    fn to_string(&self) -> String {
-        match self {
-            FailCode::Undefined => UNDEFINED.into(),
-            FailCode::Unauthenticated => UNAUTHENTICATED.into(),
-            FailCode::UnexpectedMessage => UNEXPECTED_MESSAGE.into(),
-        }
+impl fmt::Display for FailCode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}",
+            match self {
+                FailCode::Undefined => UNDEFINED,
+                FailCode::Unauthenticated => UNAUTHENTICATED,
+                FailCode::UnexpectedMessage => UNEXPECTED_MESSAGE,
+            }
+        )
     }
 }
 
