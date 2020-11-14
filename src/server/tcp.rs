@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc,
@@ -6,7 +7,7 @@ use std::sync::{
 use serde::Deserialize;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc, Semaphore};
 use tokio::time::{timeout, Duration};
 
 use crate::common::{error, info, trace, warn, Result};
@@ -88,25 +89,66 @@ impl Config {
 
 pub(crate) struct Server {
     config: Config,
+    notify_shutdown: broadcast::Sender<()>,
+    shutdown_complete_tx: mpsc::Sender<()>,
+    shutdown_complete_rx: mpsc::Receiver<()>,
 }
 
 impl Server {
     // Construct Server from config.
     pub(crate) fn new(config: Config) -> Self {
-        Self { config }
+        let (notify_shutdown, _) = broadcast::channel(1);
+        let (shutdown_complete_tx, shutdown_complete_rx) = mpsc::channel(1);
+
+        Self {
+            config,
+            notify_shutdown,
+            shutdown_complete_tx,
+            shutdown_complete_rx,
+        }
     }
 
-    pub(crate) async fn run(self, request_sender: mpsc::Sender<UnitOfWork>) -> Result<()> {
+    // Utility serve wrapper for handle systemcalls.
+    pub(crate) async fn run(mut self, request_sender: mpsc::Sender<UnitOfWork>) -> Result<()> {
         let addr = self.config.listen_addr();
         info!(%addr, "Listening...");
 
         let listener = tokio::net::TcpListener::bind(addr).await?;
 
-        self.serve(listener, request_sender).await
+        tokio::select! {
+            result = self.serve(listener, request_sender) => {
+                if let Err(err) = result {
+                    error!(cause = %err, "Failed to accept");
+                }
+            }
+            _ = tokio::signal::ctrl_c() => {
+                info!("Shutdown signal received");
+            }
+        }
+
+        let Server {
+            mut shutdown_complete_rx,
+            shutdown_complete_tx,
+            notify_shutdown,
+            ..
+        } = self;
+
+        info!("Notify shutdown to all handlers");
+        // Notify shutdown to all handler.
+        drop(notify_shutdown);
+
+        // Drop final Sender so the Receiver below can complete.
+        drop(shutdown_complete_tx);
+
+        // Wait for all handler to finish.
+        let _ = shutdown_complete_rx.recv().await;
+
+        info!("shutdown successfully completed");
+        Ok(())
     }
 
-    async fn serve(
-        self,
+    pub(crate) async fn serve(
+        &mut self,
         listener: TcpListener,
         request_sender: mpsc::Sender<UnitOfWork>,
     ) -> Result<()> {
@@ -119,8 +161,14 @@ impl Server {
 
             let connection =
                 Connection::new(socket, Some(self.config.connection_tcp_buffer_bytes()));
-            let handler =
-                Handler::new(connection, done, request_sender.clone()).with_socket_addr(addr);
+            let handler = Handler::new(
+                connection,
+                done,
+                request_sender.clone(),
+                Shutdown::new(self.notify_shutdown.subscribe()),
+                self.shutdown_complete_tx.clone(),
+            )
+            .with_socket_addr(addr);
 
             tokio::spawn(handler.handle());
         }
@@ -133,6 +181,9 @@ struct Handler {
     done: mpsc::Sender<()>,
     request_sender: mpsc::Sender<UnitOfWork>,
     remote_addr: Option<std::net::SocketAddr>,
+    shutdown: Shutdown,
+    // Send shutdown complete signal by dropping.
+    _shutdown_complete: mpsc::Sender<()>,
 }
 
 impl Handler {
@@ -140,6 +191,8 @@ impl Handler {
         connection: Connection,
         done: mpsc::Sender<()>,
         request_sender: mpsc::Sender<UnitOfWork>,
+        shutdown: Shutdown,
+        shutdown_complete_tx: mpsc::Sender<()>,
     ) -> Self {
         Self {
             principal: Arc::new(Principal::AnonymousUser),
@@ -147,6 +200,8 @@ impl Handler {
             done,
             request_sender,
             remote_addr: None,
+            shutdown,
+            _shutdown_complete: shutdown_complete_tx,
         }
     }
 
@@ -211,8 +266,21 @@ impl Handler {
     }
 
     async fn handle_message(&mut self) -> Result<()> {
-        while let Some(message) = self.connection.read_message().await? {
-            info!(?message, "Handle message");
+        // select! can't detect shutdown reliably, so explicitly check shutdown before tcp read.
+        while !self.shutdown.is_shutdown() {
+            let maybe_message = tokio::select! {
+                msg = self.connection.read_message() => msg?,
+                _ = self.shutdown.recv() => {
+                    return Ok(())
+                }
+            };
+
+            let message = match maybe_message {
+                Some(message) => message,
+                // peer closed the socket.
+                None => return Ok(()),
+            };
+
             match message {
                 Message::Ping(mut ping) => {
                     let (work, rx) = UnitOfWork::new_ping(self.principal.clone());
@@ -238,7 +306,7 @@ impl Handler {
                 Message::Fail(_) => unreachable!(),
             }
         }
-        trace!("Handle message complete");
+
         Ok(())
     }
 
@@ -311,5 +379,38 @@ impl MaxConnAwareListener {
                 warn!(%err, "Write max conn message.");
             }
         }
+    }
+}
+
+type ShutdownSignal = ();
+
+struct Shutdown {
+    shutdown: bool,
+    notify: broadcast::Receiver<ShutdownSignal>,
+}
+
+impl Shutdown {
+    fn new(notify: broadcast::Receiver<ShutdownSignal>) -> Self {
+        Self {
+            shutdown: false,
+            notify,
+        }
+    }
+
+    fn is_shutdown(&self) -> bool {
+        self.shutdown
+    }
+
+    async fn recv(&mut self) {
+        if self.shutdown {
+            return;
+        }
+
+        match self.notify.recv().await {
+            Ok(_) | Err(broadcast::error::RecvError::Closed) => (), // ok
+            Err(err) => error!("shutdown notify receive error {}", err),
+        }
+
+        self.shutdown = true;
     }
 }
