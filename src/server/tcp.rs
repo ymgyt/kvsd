@@ -12,7 +12,7 @@ use tokio::time::{timeout, Duration};
 use crate::common::{error, info, trace, warn, Result};
 use crate::core::{Principal, UnitOfWork};
 use crate::protocol::connection::Connection;
-use crate::protocol::message::{Fail, Message, Success};
+use crate::protocol::message::{Fail, FailCode, Message, Success};
 
 // Server configuration.
 #[derive(Debug, Deserialize, Default)]
@@ -188,7 +188,7 @@ impl Handler {
                             None => {
                                 info!(addr=?self.remote_addr, "unauthenticated {:?}", auth);
                                 self.connection
-                                    .write_message(Fail::new("unauthenticated"))
+                                    .write_message(Fail::from(FailCode::Unauthenticated))
                                     .await?;
                                 Ok(false)
                             }
@@ -227,7 +227,7 @@ impl Handler {
                         }
                         Err(err) if err.is_unauthorized() => {
                             self.connection
-                                .write_message(Fail::new("unauthorized ping"))
+                                .write_message(Fail::new(FailCode::Unauthenticated))
                                 .await?;
                         }
                         _ => unreachable!(),

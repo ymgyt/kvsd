@@ -122,7 +122,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::message::{Authenticate, Fail, Message, Ping, Success};
+    use crate::protocol::message::{Authenticate, Fail, FailCode, Message, Ping, Success};
 
     #[test]
     fn message_frames() {
@@ -135,7 +135,10 @@ mod tests {
                 Message::Authenticate(Authenticate::new("user", "pass")),
                 Message::Ping(Ping::new().record_client_time()),
                 Message::Success(Success::new()),
-                Message::Fail(Fail::new("fail message")),
+                Message::Fail(Fail::new(FailCode::Unauthenticated)),
+                Message::Fail(
+                    Fail::new(FailCode::UnexpectedMessage).with_message("unexpected message X"),
+                ),
             ];
             let messages_clone = messages.clone();
 

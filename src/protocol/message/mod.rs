@@ -8,7 +8,7 @@ mod success;
 pub(crate) use success::Success;
 
 mod fail;
-pub(crate) use fail::Fail;
+pub(crate) use fail::{Fail, FailCode};
 
 mod message;
 pub(crate) use message::{Message, MessageType};
