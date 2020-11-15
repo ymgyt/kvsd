@@ -1,5 +1,6 @@
 pub mod ping;
 pub mod server;
+pub mod set;
 
 use clap::{App, AppSettings, Arg, ArgMatches};
 
@@ -8,6 +9,7 @@ use crate::server::DEFAULT_PORT;
 
 pub const PING: &str = "ping";
 pub const SERVER: &str = "server";
+pub const SET: &str = "set";
 
 pub(super) const MUST_ARG_HOST: &str = "host";
 pub(super) const MUST_ARG_PORT: &str = "port";
@@ -54,6 +56,7 @@ pub fn new() -> App<'static, 'static> {
         )
         .subcommand(cli::ping::subcommand())
         .subcommand(cli::server::subcommand())
+        .subcommand(cli::set::subcommand())
         .settings(&[
             AppSettings::SubcommandRequiredElseHelp,
             AppSettings::VersionlessSubcommands,

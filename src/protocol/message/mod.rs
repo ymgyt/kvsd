@@ -19,4 +19,7 @@ pub(crate) use frame::{frameprefix, Error as FrameError, Frame, MessageFrames};
 mod parse;
 pub(crate) use parse::{Parse, ParseError};
 
+mod set;
+pub(crate) use set::Set;
+
 pub(crate) const DELIMITER: &[u8] = b"\r\n";

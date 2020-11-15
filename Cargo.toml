@@ -25,6 +25,7 @@ atoi = "0.3.3"
 serde_yaml = "0.8.14"
 serde = "1.0.117"
 rand = "0.7.3"
+async-trait = "0.1.41"
 
 [dev-dependencies]
 tokio-test = "0.3.0"

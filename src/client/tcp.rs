@@ -2,6 +2,7 @@ use tokio::net::{TcpStream, ToSocketAddrs};
 
 use crate::protocol::connection::Connection;
 use crate::protocol::message::{Authenticate, Message, Ping};
+use crate::protocol::{Key, Value};
 use crate::{KvsError, Result};
 
 pub struct Client {
@@ -60,5 +61,9 @@ impl Client {
             Some(Message::Ping(ping)) => Ok(ping.latency().unwrap()),
             msg => Err(format!("unexpected message {:?}", msg).into()),
         }
+    }
+
+    pub async fn set(&mut self, _key: Key, _value: Value) -> Result<()> {
+        todo!()
     }
 }

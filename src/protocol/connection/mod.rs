@@ -51,6 +51,12 @@ where
                 self.stream.write_all(val.as_bytes()).await?;
                 self.stream.write_all(DELIMITER).await?;
             }
+            Frame::Bytes(val) => {
+                self.stream.write_u8(frameprefix::BYTES).await?;
+                self.write_decimal(val.len() as u64).await?;
+                self.stream.write_all(val.as_ref()).await?;
+                self.stream.write_all(DELIMITER).await?;
+            }
             Frame::Time(val) => {
                 self.stream.write_u8(frameprefix::TIME).await?;
                 self.stream.write_all(val.to_rfc3339().as_bytes()).await?;
@@ -133,7 +139,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::message::{Authenticate, Fail, FailCode, Message, Ping, Success};
+    use crate::protocol::message::{Authenticate, Fail, FailCode, Message, Ping, Set, Success};
+    use crate::protocol::{Key, Value};
 
     #[test]
     fn message_frames() {
@@ -150,6 +157,10 @@ mod tests {
                 Message::Fail(
                     Fail::new(FailCode::UnexpectedMessage).with_message("unexpected message X"),
                 ),
+                Message::Set(Set::new(
+                    Key::new("key1").unwrap(),
+                    Value::new(b"value1".as_ref()).unwrap(),
+                )),
             ];
             let messages_clone = messages.clone();
 

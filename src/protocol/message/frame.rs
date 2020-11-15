@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use bytes::{Buf, Bytes};
+use bytes::Buf;
 
 use crate::common::{self, Time};
 use crate::protocol::message::{MessageType, DELIMITER};
@@ -10,7 +10,7 @@ pub(crate) enum Frame {
     MessageType(MessageType),
     String(String),
     U64(u64),
-    Bytes(Bytes),
+    Bytes(Vec<u8>),
     Time(Time),
     Null,
 }
@@ -19,6 +19,7 @@ pub(crate) mod frameprefix {
     pub(crate) const MESSAGE_FRAMES: u8 = b'*';
     pub(crate) const MESSAGE_TYPE: u8 = b'#';
     pub(crate) const STRING: u8 = b'+';
+    pub(crate) const BYTES: u8 = b'$';
     pub(crate) const TIME: u8 = b'T';
     pub(crate) const NULL: u8 = b'|';
 }
@@ -47,7 +48,7 @@ impl MessageFrames {
         self.0.push(Frame::String(s.into()))
     }
 
-    pub(crate) fn push_bytes(&mut self, bytes: impl Into<Bytes>) {
+    pub(crate) fn push_bytes(&mut self, bytes: impl Into<Vec<u8>>) {
         self.0.push(Frame::Bytes(bytes.into()));
     }
 
@@ -120,6 +121,11 @@ impl Frame {
                 cursor::get_line(src)?;
                 Ok(())
             }
+            frameprefix::BYTES => {
+                let len = cursor::get_decimal(src)? as usize;
+                // skip bytes length + delimiter
+                cursor::skip(src, len + 2)
+            }
             frameprefix::TIME => {
                 cursor::get_line(src)?;
                 Ok(())
@@ -137,6 +143,13 @@ impl Frame {
                 let line = cursor::get_line(src)?.to_vec();
                 let string = String::from_utf8(line).map_err(|e| Error::Invalid(e.to_string()))?;
                 Ok(Frame::String(string))
+            }
+            frameprefix::BYTES => {
+                let len = cursor::get_decimal(src)? as usize;
+                let value = cursor::get_line(src)?.to_vec();
+                debug_assert_eq!(len, value.len());
+
+                Ok(Frame::Bytes(value))
             }
             frameprefix::TIME => {
                 use chrono::{DateTime, Utc};
@@ -167,11 +180,26 @@ impl IntoIterator for MessageFrames {
 mod cursor {
     use super::*;
 
+    pub(super) fn peek_u8(src: &mut ByteCursor) -> Result<u8, Error> {
+        if !src.has_remaining() {
+            return Err(Error::Incomplete);
+        }
+        Ok(src.bytes()[0])
+    }
+
     pub(super) fn get_u8(src: &mut ByteCursor) -> Result<u8, Error> {
         if !src.has_remaining() {
             return Err(Error::Incomplete);
         }
         Ok(src.get_u8())
+    }
+
+    pub(super) fn skip(src: &mut ByteCursor, n: usize) -> Result<(), Error> {
+        if src.remaining() < n {
+            return Err(Error::Incomplete);
+        }
+        src.advance(n);
+        Ok(())
     }
 
     pub(super) fn get_decimal(src: &mut ByteCursor) -> Result<u64, Error> {

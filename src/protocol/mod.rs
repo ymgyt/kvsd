@@ -18,7 +18,7 @@ pub const MAX_VALUE_BYTES: usize = 1024 * 1024 * 10;
 
 // Key represents a string that meets the specifications of the kvs protocol.
 // other components can handle Key without checking the length.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Key(String);
 
 impl Deref for Key {
@@ -31,6 +31,13 @@ impl Deref for Key {
 impl fmt::Display for Key {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl TryFrom<String> for Key {
+    type Error = KvsError;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Key::new(s)
     }
 }
 
@@ -55,6 +62,7 @@ impl Key {
 
 // Value represents binary data given by user.
 // It does not have to be Vec<u8> because we do not mutate.
+#[derive(Clone, PartialEq)]
 pub struct Value(Box<[u8]>);
 
 impl Deref for Value {
@@ -78,6 +86,16 @@ impl Value {
 
     pub fn into_boxed_bytes(self) -> Box<[u8]> {
         self.0
+    }
+}
+
+impl fmt::Debug for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.len() > 1024 {
+            write!(f, "{}", String::from_utf8_lossy(&self.deref()[..1024]))
+        } else {
+            write!(f, "{}", String::from_utf8_lossy(self.deref()))
+        }
     }
 }
 

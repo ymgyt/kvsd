@@ -335,6 +335,7 @@ impl Handler {
                         _ => unreachable!(),
                     }
                 }
+                Message::Set(_set) => todo!(),
                 Message::Authenticate(_) => unreachable!(),
                 Message::Success(_) => unreachable!(),
                 Message::Fail(_) => unreachable!(),

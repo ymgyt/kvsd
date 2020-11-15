@@ -33,6 +33,13 @@ impl Parse {
         }
     }
 
+    pub(crate) fn next_bytes(&mut self) -> Result<Vec<u8>, ParseError> {
+        match self.next()? {
+            Frame::Bytes(val) => Ok(val),
+            frame => Err(format!("unexpected frame. want bytes got {:?}", frame).into()),
+        }
+    }
+
     pub(crate) fn next_time_or_null(&mut self) -> Result<Option<Time>, ParseError> {
         match self.next()? {
             Frame::Time(time) => Ok(Some(time)),

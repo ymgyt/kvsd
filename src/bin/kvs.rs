@@ -43,6 +43,7 @@ async fn run_inner() -> kvs::Result<()> {
     match m.subcommand() {
         (cli::PING, Some(sm)) => cli::ping::run(sm).await,
         (cli::SERVER, Some(sm)) => cli::server::run(sm).await,
+        (cli::SET, Some(sm)) => cli::set::run(sm).await,
         (_, _) => unreachable!(),
     }
 }
