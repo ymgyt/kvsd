@@ -5,7 +5,7 @@ pub(crate) struct Config {
     pub(crate) users: Vec<UserEntry>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub(crate) struct UserEntry {
     pub(crate) username: String,
     pub(crate) password: String,

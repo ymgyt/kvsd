@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::fmt;
 
 use tokio::sync::oneshot;
 
@@ -44,5 +45,18 @@ impl UnitOfWork {
             }),
             rx,
         )
+    }
+}
+
+impl fmt::Debug for UnitOfWork {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result{
+        match self {
+            UnitOfWork::Authenticate(_) => {
+                write!(f, "Authenticate")
+            }
+            UnitOfWork::Ping(_) => {
+                write!(f, "Ping")
+            }
+        }
     }
 }

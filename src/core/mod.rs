@@ -10,7 +10,9 @@ mod principal;
 pub(crate) use self::principal::Principal;
 
 mod uow;
-pub(crate) use self::uow::UnitOfWork;
+pub(crate) use self::uow::{UnitOfWork, Work};
 
 mod credential;
 pub(crate) use self::credential::{Credential, Password, Provider as CredentialProvider};
+
+mod middleware;
