@@ -1,14 +1,21 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
+use tokio::sync::mpsc;
 
 use crate::common::{info, ErrorKind, Result};
 use crate::core::middleware::Middleware;
 use crate::core::UnitOfWork;
 
-pub(crate) struct Dispatcher {}
+pub(crate) struct Dispatcher {
+    table: HashMap<String, HashMap<String, mpsc::Sender<UnitOfWork>>>,
+}
 
 impl Dispatcher {
     pub(crate) fn new() -> Self {
-        Self {}
+        Self {
+            table: HashMap::new(),
+        }
     }
 }
 

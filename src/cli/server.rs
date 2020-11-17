@@ -1,5 +1,7 @@
-use clap::{App, Arg, ArgMatches, SubCommand};
+use std::path::Path;
 use std::str::FromStr;
+
+use clap::{App, Arg, ArgMatches, SubCommand};
 
 use crate::cli::SERVER;
 use crate::common::debug;
@@ -13,6 +15,7 @@ const ARG_AUTHENTICATE_TIMEOUT_MILLISECONDS: &str = "server_authenticate_timeout
 const ARG_CONFIG_PATH: &str = "server_config_path";
 const ARG_HOST: &str = "server_host";
 const ARG_PORT: &str = "server_port";
+const MUST_ARG_KVS_DIR: &str = "kvs_dir";
 
 pub(super) fn subcommand() -> App<'static, 'static> {
     SubCommand::with_name(SERVER)
@@ -61,6 +64,14 @@ pub(super) fn subcommand() -> App<'static, 'static> {
                 .env("KVS_SERVER_PORT")
                 .help("Tcp binding address port"),
         )
+        .arg(
+            Arg::with_name(MUST_ARG_KVS_DIR)
+                .long("kvs-dir")
+                .takes_value(true)
+                .default_value(".kvs")
+                .env("KVS_DIR")
+                .help("root directory where kvs store it's data"),
+        )
 }
 
 pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
@@ -69,13 +80,24 @@ pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
         .and_then(|s| std::path::PathBuf::from_str(s).ok())
         .unwrap();
 
+    let root_dir = m
+        .value_of(MUST_ARG_KVS_DIR)
+        .map(Path::new)
+        .and_then(|p| p.canonicalize().ok())
+        .unwrap();
+
     let mut initializer = Initializer::load_config_file(config_path).await?;
 
     initializer
         .config
         .server
         .override_merge(&mut read_server_config(m));
+
+    initializer.config.kvs.root_dir = Some(root_dir);
+
     debug!("{:?}", initializer);
+
+    initializer.init_dir().await?;
 
     initializer.run_kvs().await.map_err(KvsError::from)
 }

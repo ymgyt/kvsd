@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use tokio::prelude::io::AsyncReadExt;
 
 use crate::common::Result;
-use crate::core::store::table::entry::Entry;
+use crate::core::table::entry::Entry;
 
 #[derive(Debug)]
 pub(super) struct Index {

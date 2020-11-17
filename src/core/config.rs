@@ -1,8 +1,11 @@
+use std::path::PathBuf;
+
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Config {
     pub(crate) users: Vec<UserEntry>,
+    pub(crate) root_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -13,6 +16,9 @@ pub(crate) struct UserEntry {
 
 impl Default for Config {
     fn default() -> Self {
-        Self { users: Vec::new() }
+        Self {
+            users: Vec::new(),
+            root_dir: None,
+        }
     }
 }

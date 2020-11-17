@@ -4,7 +4,7 @@ pub(crate) use self::kvs::Builder;
 mod config;
 pub(crate) use self::config::{Config, UserEntry};
 
-mod store;
+mod table;
 
 mod principal;
 pub(crate) use self::principal::Principal;

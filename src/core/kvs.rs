@@ -1,7 +1,7 @@
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
 use crate::common::{error, info, Result};
-use crate::core::middleware::MiddlewareChain;
+use crate::core::middleware::{Dispatcher, MiddlewareChain};
 use crate::core::{Config, UnitOfWork};
 
 #[derive(Default)]
@@ -17,16 +17,23 @@ impl Builder {
         builder
     }
 
-    pub(crate) fn build(self) -> Result<Kvs> {
+    pub(crate) async fn build(mut self) -> Result<Kvs> {
         let (send, recv) = mpsc::channel(self.request_channel_buffer);
 
-        let mw = MiddlewareChain::new(&self.config.unwrap_or_default());
+        let dispatcher = self.build_dispatcher().await?;
+
+        let mw = MiddlewareChain::new(&self.config.unwrap_or_default(),dispatcher);
 
         Ok(Kvs {
             request_send: send,
             request_recv: recv,
             middlewares: mw,
         })
+    }
+
+    async fn build_dispatcher(&mut self) -> Result<Dispatcher> {
+
+        Ok(Dispatcher::new())
     }
 
     fn new() -> Self {

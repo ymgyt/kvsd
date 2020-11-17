@@ -7,9 +7,7 @@ pub(crate) struct MiddlewareChain {
 }
 
 impl MiddlewareChain {
-    pub(crate) fn new(config: &Config) -> Self {
-        let dispatcher = Dispatcher::new();
-
+    pub(crate) fn new(config: &Config, dispatcher: Dispatcher) -> Self {
         let authorizer = Authorizer::new(dispatcher);
 
         let authenticator = Authenticator::new(config.users.clone(), authorizer);
