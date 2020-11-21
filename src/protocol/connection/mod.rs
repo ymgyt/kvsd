@@ -139,7 +139,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::message::{Authenticate, Fail, FailCode, Message, Ping, Set, Success,Get};
+    use crate::protocol::message::{
+        Authenticate, Fail, FailCode, Get, Message, Ping, Set, Success,
+    };
     use crate::protocol::{Key, Value};
 
     #[test]
@@ -161,7 +163,7 @@ mod tests {
                     Key::new("key1").unwrap(),
                     Value::new(b"value1".as_ref()).unwrap(),
                 )),
-                Message::Get(Get::new( Key::new("key1").unwrap())),
+                Message::Get(Get::new(Key::new("key1").unwrap())),
             ];
             let messages_clone = messages.clone();
 

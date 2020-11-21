@@ -1,15 +1,15 @@
-use crate::protocol::Key;
-use crate::protocol::message::{Parse, MessageFrames, MessageType};
 use crate::common::Result;
+use crate::protocol::message::{MessageFrames, MessageType, Parse};
+use crate::protocol::Key;
 
-#[derive(Debug, Clone,PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Get {
     pub(crate) key: Key,
 }
 
 impl Get {
     pub(crate) fn new(key: Key) -> Self {
-        Self{ key }
+        Self { key }
     }
 
     pub(crate) fn parse_frames(parse: &mut Parse) -> Result<Self> {
@@ -21,7 +21,7 @@ impl Get {
 
 impl Into<MessageFrames> for Get {
     fn into(self) -> MessageFrames {
-       let mut frames = MessageFrames::with_capacity(MessageType::Get, 1);
+        let mut frames = MessageFrames::with_capacity(MessageType::Get, 1);
 
         frames.push_string(self.key.into_string());
 

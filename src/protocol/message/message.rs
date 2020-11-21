@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use crate::common::{Error, ErrorKind, Result};
-use crate::protocol::message::{Authenticate, Fail, MessageFrames, Parse, Ping, Set, Success,Get};
+use crate::protocol::message::{Authenticate, Fail, Get, MessageFrames, Parse, Ping, Set, Success};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MessageType {
