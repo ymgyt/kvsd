@@ -17,6 +17,20 @@ impl Dispatcher {
             table: HashMap::new(),
         }
     }
+
+    pub(crate) fn add_table<S>(
+        &mut self,
+        namespace: S,
+        table: S,
+        sender: mpsc::Sender<UnitOfWork>,
+    ) where
+        S: Into<String>,
+    {
+        self.table
+            .entry(namespace.into())
+            .or_insert(HashMap::new())
+            .insert(table.into(), sender);
+    }
 }
 
 #[async_trait]

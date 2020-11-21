@@ -2,7 +2,9 @@ use tokio::sync::mpsc::{self, Receiver, Sender};
 
 use crate::common::{error, info, Result};
 use crate::core::middleware::{Dispatcher, MiddlewareChain};
+use crate::core::table::Table;
 use crate::core::{Config, UnitOfWork};
+use crate::config::filepath;
 
 #[derive(Default)]
 pub(crate) struct Builder {
@@ -32,8 +34,20 @@ impl Builder {
     }
 
     async fn build_dispatcher(&mut self) -> Result<Dispatcher> {
+        // TODO configure channel size
+        let (tx, rx) = mpsc::channel(1024);
 
-        Ok(Dispatcher::new())
+        let root_dir = self.config.as_ref().unwrap().root_dir.as_ref().unwrap();
+        let default_table = root_dir.join(filepath::NAMESPACES).join(filepath::NS_DEFAULT).join("default/default.kvs");
+        let default_table = tokio::fs::File::open(default_table).await?;
+        let default_table = Table::new(rx,default_table).await?;
+
+        tokio::spawn(default_table.run());
+
+        let mut dispatcher = Dispatcher::new();
+        dispatcher.add_table("default", "default", tx);
+
+        Ok(dispatcher)
     }
 
     fn new() -> Self {

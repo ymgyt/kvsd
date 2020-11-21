@@ -3,7 +3,7 @@ use std::path::Path;
 use tokio::fs;
 
 use crate::common::{info,Result};
-use crate::config::Config;
+use crate::config::{filepath,Config};
 use crate::core;
 use crate::server::tcp::Server;
 
@@ -40,11 +40,11 @@ impl Initializer {
         tokio::fs::create_dir_all(root_dir.as_path()).await?;
 
         // Namespaces.
-        let namespaces = root_dir.join("namespaces");
+        let namespaces = root_dir.join(filepath::NAMESPACES);
         tokio::fs::create_dir_all(namespaces.as_path()).await?;
 
         let initial_namespaces = vec![
-            namespaces.join("system"),
+            namespaces.join(filepath::NS_SYSTEM),
             namespaces.join("default/default")
         ];
 
