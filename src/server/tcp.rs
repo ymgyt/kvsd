@@ -353,6 +353,7 @@ impl Handler {
                         _ => todo!(),
                     }
                 }
+                Message::Get(_) => todo!(),
                 Message::Authenticate(_) => unreachable!(),
                 Message::Success(_) => unreachable!(),
                 Message::Fail(_) => unreachable!(),
