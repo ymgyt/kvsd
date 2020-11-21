@@ -23,7 +23,8 @@ impl Table<fs::File> {
         let f = fs::OpenOptions::new()
             .read(true)
             .write(true)
-            .open(path.as_ref()).await?;
+            .open(path.as_ref())
+            .await?;
 
         Table::new(receiver, f).await
     }

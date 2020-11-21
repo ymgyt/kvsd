@@ -96,10 +96,10 @@ impl Config {
             "{}:{}",
             self.listen_host
                 .as_deref()
-                .unwrap_or( Config::DEFAULT_LISTEN_HOST),
+                .unwrap_or(Config::DEFAULT_LISTEN_HOST),
             self.listen_port
                 .as_deref()
-                .unwrap_or( Config::DEFAULT_LISTEN_PORT),
+                .unwrap_or(Config::DEFAULT_LISTEN_PORT),
         )
     }
 }

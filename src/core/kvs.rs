@@ -1,6 +1,6 @@
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
-use crate::common::{error, info, Result, debug};
+use crate::common::{debug, error, info, Result};
 use crate::config::filepath;
 use crate::core::middleware::{Dispatcher, MiddlewareChain};
 use crate::core::table::Table;
