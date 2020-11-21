@@ -59,7 +59,7 @@ impl Entry {
         + 4 // crc_checksum
     ;
 
-    fn new(key: Key, value: Value) -> Result<Self> {
+    pub(super) fn new(key: Key, value: Value) -> Result<Self> {
         let header = Header {
             key_bytes: key.len(),
             value_bytes: value.len(),
@@ -90,7 +90,7 @@ impl Entry {
     // Write binary expression to writer.
     // return written bytes.
     // flush is left to the caller.
-    async fn encode_to<W: AsyncWriteExt + Unpin>(&self, mut writer: W) -> Result<usize> {
+    pub(crate) async fn encode_to<W: AsyncWriteExt + Unpin>(&self, mut writer: W) -> Result<usize> {
         // Assuming that the validation is done at the timeout entry construction.
         debug_assert!(self.assert());
 

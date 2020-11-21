@@ -9,7 +9,7 @@ mod table;
 mod principal;
 pub(crate) use self::principal::Principal;
 
-mod uow;
+pub(crate) mod uow;
 pub(crate) use self::uow::{UnitOfWork, Work};
 
 mod credential;

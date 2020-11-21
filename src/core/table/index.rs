@@ -30,6 +30,9 @@ impl Index {
             }
         }
     }
+    pub(super) fn add(&mut self, key: String, offset: usize) -> Option<usize>{
+       self.entry_offsets.insert(key, offset)
+    }
 
     pub(super) fn lookup_offset(&self, key: &str) -> Option<usize> {
         self.entry_offsets.get(key).cloned()

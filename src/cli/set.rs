@@ -35,7 +35,9 @@ pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
 
     let mut client = authenticate(m).await?;
 
-    client.set(key, value).await?;
+    if let Ok(_) = client.set(key, value).await {
+        println!("OK");
+    }
 
     Ok(())
 }

@@ -20,7 +20,6 @@ where
     MW: Middleware + Send + 'static,
 {
     async fn apply(&mut self, uow: UnitOfWork) -> Result<()> {
-
         let start = tokio::time::Instant::now();
         let log = format!("{:?}", uow);
 

@@ -1,7 +1,7 @@
 use tokio::net::{TcpStream, ToSocketAddrs};
 
 use crate::protocol::connection::Connection;
-use crate::protocol::message::{Authenticate, Message, Ping};
+use crate::protocol::message::{Authenticate, Message, Ping, Set};
 use crate::protocol::{Key, Value};
 use crate::{KvsError, Result};
 
@@ -63,7 +63,17 @@ impl Client {
         }
     }
 
-    pub async fn set(&mut self, _key: Key, _value: Value) -> Result<()> {
-        todo!()
+    pub async fn set(&mut self, key: Key, value: Value) -> Result<()> {
+        let set = Set::new(key, value);
+        self.connection.write_message(set).await?;
+        match self.connection.read_message().await? {
+            Some(Message::Success(_)) => Ok(()),
+            msg => Err(KvsError::Internal(
+                Box::<dyn std::error::Error + Send + Sync>::from(format!(
+                    "unexpected message: {:?}",
+                    msg
+                )),
+            )),
+        }
     }
 }

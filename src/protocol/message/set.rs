@@ -4,8 +4,8 @@ use crate::protocol::{Key, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Set {
-    key: Key,
-    value: Value,
+    pub(crate) key: Key,
+    pub(crate) value: Value,
 }
 
 impl Set {

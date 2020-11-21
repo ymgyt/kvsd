@@ -27,13 +27,16 @@ pub(crate) enum ErrorKind {
     NetworkFraming(String),
     Kvs(KvsError),
     Unauthorized(String),
+    Unauthenticated,
     Internal(String), // Box<dyn std::error::Error + Send + 'static> does not work :(
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.kind() {
-            ErrorKind::Io(err) => err.fmt(f),
+            ErrorKind::Io(err) => {
+                write!(f, "I/O error: {}", err)
+            }
             ErrorKind::Yaml(err) => err.fmt(f),
             ErrorKind::EntryDecode { description, .. } => {
                 write!(f, "entry decode error. {}", description)
@@ -45,6 +48,7 @@ impl fmt::Display for Error {
             ErrorKind::NetworkFraming(err) => write!(f, "network framing {}", err),
             ErrorKind::Kvs(err) => err.fmt(f),
             ErrorKind::Unauthorized(err) => write!(f, "unauthorized {}", err),
+            ErrorKind::Unauthenticated => write!(f, "unauthenticated"),
             ErrorKind::Internal(err) => write!(f, "internal error {}", err),
         }
     }

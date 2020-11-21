@@ -25,6 +25,14 @@ impl<MW> Authenticator<MW> {
         }
         Ok(None)
     }
+
+    fn check_principal(&self, principal: &Principal) -> Result<()> {
+        if principal.is_authenticated() {
+            Ok(())
+        } else {
+            Err(ErrorKind::Unauthenticated.into())
+        }
+    }
 }
 
 #[async_trait]
@@ -47,12 +55,13 @@ where
 
                 Ok(())
             }
-            UnitOfWork::Ping(Work { ref principal, .. }) => {
-                if !principal.is_authenticated() {
-                    // TODO: write unauthenticated response.
-                    todo!()
-                } else {
-                    self.next.apply(uow).await
+            UnitOfWork::Ping(Work { ref principal, .. })
+            | UnitOfWork::Set(Work { ref principal, .. }) => {
+                let r = self.check_principal(principal.as_ref());
+
+                match r {
+                    Ok(_) => self.next.apply(uow).await,
+                    Err(err) => Err(err),
                 }
             }
         }

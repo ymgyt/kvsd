@@ -18,17 +18,13 @@ impl Dispatcher {
         }
     }
 
-    pub(crate) fn add_table<S>(
-        &mut self,
-        namespace: S,
-        table: S,
-        sender: mpsc::Sender<UnitOfWork>,
-    ) where
+    pub(crate) fn add_table<S>(&mut self, namespace: S, table: S, sender: mpsc::Sender<UnitOfWork>)
+    where
         S: Into<String>,
     {
         self.table
             .entry(namespace.into())
-            .or_insert(HashMap::new())
+            .or_insert_with(HashMap::new)
             .insert(table.into(), sender);
     }
 }
@@ -59,6 +55,20 @@ impl Middleware for Dispatcher {
                     .map_err(|_| ErrorKind::Internal("send to resp channel".to_owned()))?;
 
                 Ok(())
+            }
+            UnitOfWork::Set(ref set) => {
+                match self
+                    .table
+                    .get(&set.request.namespace)
+                    .and_then(|tables| tables.get(&set.request.table))
+                {
+                    Some(sender) => Ok(sender.send(uow).await?),
+                    None => Err(ErrorKind::Internal(format!(
+                        "table not found {}/{}",
+                        set.request.namespace, set.request.table
+                    ))
+                    .into()),
+                }
             }
             _ => unreachable!(),
         }

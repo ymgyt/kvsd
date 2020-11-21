@@ -2,8 +2,8 @@ use std::path::Path;
 
 use tokio::fs;
 
-use crate::common::{info,Result};
-use crate::config::{filepath,Config};
+use crate::common::{info, Result};
+use crate::config::{filepath, Config};
 use crate::core;
 use crate::server::tcp::Server;
 
@@ -45,7 +45,7 @@ impl Initializer {
 
         let initial_namespaces = vec![
             namespaces.join(filepath::NS_SYSTEM),
-            namespaces.join("default/default")
+            namespaces.join("default/default"),
         ];
 
         for ns in &initial_namespaces {

@@ -10,6 +10,7 @@ use tokio::sync::{broadcast, mpsc, Semaphore};
 use tokio::time::{timeout, Duration};
 
 use crate::common::{error, info, trace, warn, Result};
+use crate::core::uow::Set;
 use crate::core::{Principal, UnitOfWork};
 use crate::protocol::connection::Connection;
 use crate::protocol::message::{Fail, FailCode, Message, Success};
@@ -95,10 +96,10 @@ impl Config {
             "{}:{}",
             self.listen_host
                 .as_deref()
-                .unwrap_or_else(|| Config::DEFAULT_LISTEN_HOST),
+                .unwrap_or( Config::DEFAULT_LISTEN_HOST),
             self.listen_port
                 .as_deref()
-                .unwrap_or_else(|| Config::DEFAULT_LISTEN_PORT),
+                .unwrap_or( Config::DEFAULT_LISTEN_PORT),
         )
     }
 }
@@ -335,7 +336,23 @@ impl Handler {
                         _ => unreachable!(),
                     }
                 }
-                Message::Set(_set) => todo!(),
+                Message::Set(set) => {
+                    // TODO: store namespace as state.
+                    let set = Set {
+                        namespace: "default".into(),
+                        table: "default".into(),
+                        key: set.key,
+                        value: set.value,
+                    };
+                    let (work, rx) = UnitOfWork::new_set(self.principal.clone(), set);
+                    self.request_sender.send(work).await?;
+
+                    match rx.await? {
+                        // TODO: write back previous value.
+                        Ok(_) => self.connection.write_message(Success::new()).await?,
+                        _ => todo!(),
+                    }
+                }
                 Message::Authenticate(_) => unreachable!(),
                 Message::Success(_) => unreachable!(),
                 Message::Fail(_) => unreachable!(),

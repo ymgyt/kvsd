@@ -1,10 +1,10 @@
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
-use crate::common::{error, info, Result};
+use crate::common::{error, info, Result, debug};
+use crate::config::filepath;
 use crate::core::middleware::{Dispatcher, MiddlewareChain};
 use crate::core::table::Table;
 use crate::core::{Config, UnitOfWork};
-use crate::config::filepath;
 
 #[derive(Default)]
 pub(crate) struct Builder {
@@ -24,7 +24,7 @@ impl Builder {
 
         let dispatcher = self.build_dispatcher().await?;
 
-        let mw = MiddlewareChain::new(&self.config.unwrap_or_default(),dispatcher);
+        let mw = MiddlewareChain::new(&self.config.unwrap_or_default(), dispatcher);
 
         Ok(Kvs {
             request_send: send,
@@ -38,9 +38,12 @@ impl Builder {
         let (tx, rx) = mpsc::channel(1024);
 
         let root_dir = self.config.as_ref().unwrap().root_dir.as_ref().unwrap();
-        let default_table = root_dir.join(filepath::NAMESPACES).join(filepath::NS_DEFAULT).join("default/default.kvs");
-        let default_table = tokio::fs::File::open(default_table).await?;
-        let default_table = Table::new(rx,default_table).await?;
+        let default_table = root_dir
+            .join(filepath::NAMESPACES)
+            .join(filepath::NS_DEFAULT)
+            .join("default/default.kvs");
+        debug!("Open default table file {}", default_table.display());
+        let default_table = Table::from_path(rx, default_table).await?;
 
         tokio::spawn(default_table.run());
 
