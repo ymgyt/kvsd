@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use tokio::sync::oneshot;
 
-use crate::common::{Result, Time};
+use crate::common::{ErrorKind, Result, Time};
 use crate::core::{credential, Principal};
 use crate::protocol::Value;
 
@@ -25,6 +25,16 @@ pub(crate) struct Work<Req, Res> {
     pub(crate) request: Req,
     // Wrap with option so that response can be sent via mut reference.
     pub(crate) response_sender: Option<oneshot::Sender<Result<Res>>>,
+}
+
+impl<Req, Res> Work<Req, Res> {
+    pub(crate) fn send_response(&mut self, response: Result<Res>) -> Result<()> {
+        self.response_sender
+            .take()
+            .expect("response already sent")
+            .send(response)
+            .map_err(|_| ErrorKind::Internal("send response".to_owned()).into())
+    }
 }
 
 impl UnitOfWork {

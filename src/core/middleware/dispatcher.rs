@@ -53,23 +53,13 @@ impl Middleware for Dispatcher {
             UnitOfWork::Set(ref mut set) => {
                 match self.lookup_table(&set.request.namespace, &set.request.table) {
                     Ok(sender) => Ok(sender.send(uow).await?),
-                    Err(err) => set
-                        .response_sender
-                        .take()
-                        .expect("response already sent")
-                        .send(Err(err))
-                        .map_err(|_| ErrorKind::Internal("send response".to_owned()).into()),
+                    Err(err) => set.send_response(Err(err)),
                 }
             }
             UnitOfWork::Get(ref mut get) => {
                 match self.lookup_table(&get.request.namespace, &get.request.table) {
                     Ok(sender) => Ok(sender.send(uow).await?),
-                    Err(err) => get
-                        .response_sender
-                        .take()
-                        .expect("response already sent")
-                        .send(Err(err))
-                        .map_err(|_| ErrorKind::Internal("send response".to_owned()).into()),
+                    Err(err) => get.send_response(Err(err)),
                 }
             }
             _ => unreachable!(),
