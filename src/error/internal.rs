@@ -28,6 +28,7 @@ pub(crate) enum ErrorKind {
     Kvs(KvsError),
     Unauthorized(String),
     Unauthenticated,
+    TableNotFound(String),
     Internal(String), // Box<dyn std::error::Error + Send + 'static> does not work :(
 }
 
@@ -49,6 +50,7 @@ impl fmt::Display for Error {
             ErrorKind::Kvs(err) => err.fmt(f),
             ErrorKind::Unauthorized(err) => write!(f, "unauthorized {}", err),
             ErrorKind::Unauthenticated => write!(f, "unauthenticated"),
+            ErrorKind::TableNotFound(err) => write!(f, "table {} not found", err),
             ErrorKind::Internal(err) => write!(f, "internal error {}", err),
         }
     }

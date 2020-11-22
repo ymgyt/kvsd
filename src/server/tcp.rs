@@ -10,7 +10,7 @@ use tokio::sync::{broadcast, mpsc, Semaphore};
 use tokio::time::{timeout, Duration};
 
 use crate::common::{error, info, trace, warn, Result};
-use crate::core::uow::Set;
+use crate::core::uow::{Get, Set};
 use crate::core::{Principal, UnitOfWork};
 use crate::protocol::connection::Connection;
 use crate::protocol::message::{Fail, FailCode, Message, Success};
@@ -353,7 +353,25 @@ impl Handler {
                         _ => todo!(),
                     }
                 }
-                Message::Get(_) => todo!(),
+                Message::Get(get) => {
+                    let get = Get {
+                        namespace: "default".into(),
+                        table: "default".into(),
+                        key: get.key,
+                    };
+                    let (work, rx) = UnitOfWork::new_get(self.principal.clone(), get);
+                    self.request_sender.send(work).await?;
+
+                    match rx.await? {
+                        Ok(Some(value)) => {
+                            self.connection
+                                .write_message(Success::with_value(value))
+                                .await?
+                        }
+                        Ok(None) => self.connection.write_message(Success::new()).await?,
+                        _ => unreachable!(),
+                    }
+                }
                 Message::Authenticate(_) => unreachable!(),
                 Message::Success(_) => unreachable!(),
                 Message::Fail(_) => unreachable!(),

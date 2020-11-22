@@ -41,6 +41,7 @@ where
     MW: Middleware + Send + 'static,
 {
     async fn apply(&mut self, uow: UnitOfWork) -> Result<()> {
+        // TODO: need derive impl that can provide principal
         match uow {
             UnitOfWork::Authenticate(auth) => {
                 let credential = auth.request.credential();
@@ -48,6 +49,7 @@ where
                     Credential::Password(password) => {
                         info!(user=?password.username, "Try authenticate ");
                         auth.response_sender
+                            .expect("response already sent")
                             .send(self.authenticate_by_password(password))
                             .map_err(|_| ErrorKind::Internal("send to resp channel".into()))?;
                     }
@@ -56,7 +58,8 @@ where
                 Ok(())
             }
             UnitOfWork::Ping(Work { ref principal, .. })
-            | UnitOfWork::Set(Work { ref principal, .. }) => {
+            | UnitOfWork::Set(Work { ref principal, .. })
+            | UnitOfWork::Get(Work { ref principal, .. }) => {
                 let r = self.check_principal(principal.as_ref());
 
                 match r {

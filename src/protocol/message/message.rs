@@ -58,7 +58,7 @@ impl Message {
                 Message::Authenticate(Authenticate::parse_frames(&mut parse)?)
             }
             MessageType::Ping => Message::Ping(Ping::parse_frames(&mut parse)?),
-            MessageType::Success => Message::Success(Success::new()),
+            MessageType::Success => Message::Success(Success::parse_frames(&mut parse)?),
             MessageType::Fail => Message::Fail(Fail::parse_frames(&mut parse)?),
             MessageType::Set => Message::Set(Set::parse_frames(&mut parse)?),
             MessageType::Get => Message::Get(Get::parse_frames(&mut parse)?),

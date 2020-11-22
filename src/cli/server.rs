@@ -80,11 +80,10 @@ pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
         .and_then(|s| std::path::PathBuf::from_str(s).ok())
         .unwrap();
 
-    let root_dir = m
-        .value_of(MUST_ARG_KVS_DIR)
-        .map(Path::new)
-        .and_then(|p| p.canonicalize().ok())
-        .unwrap();
+    // Canonicalize require path already exist.
+    let root_dir = m.value_of(MUST_ARG_KVS_DIR).map(Path::new).unwrap();
+    tokio::fs::create_dir_all(root_dir).await?;
+    let root_dir = root_dir.canonicalize().unwrap();
 
     let mut initializer = Initializer::load_config_file(config_path).await?;
 

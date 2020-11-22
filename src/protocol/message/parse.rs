@@ -40,11 +40,32 @@ impl Parse {
         }
     }
 
+    pub(crate) fn next_bytes_or_null(&mut self) -> Result<Option<Vec<u8>>, ParseError> {
+        match self.next()? {
+            Frame::Bytes(val) => Ok(Some(val)),
+            Frame::Null => Ok(None),
+            frame => Err(format!("unexpected frame. want (bytes|null) got {:?}", frame).into()),
+        }
+    }
+
     pub(crate) fn next_time_or_null(&mut self) -> Result<Option<Time>, ParseError> {
         match self.next()? {
             Frame::Time(time) => Ok(Some(time)),
             Frame::Null => Ok(None),
             frame => Err(format!("unexpected frame. want (time|null) got {:?} ", frame).into()),
+        }
+    }
+
+    // Make sure that caller has parse all the frames.
+    pub(crate) fn expect_consumed(&mut self) -> Result<()> {
+        match self.next() {
+            Ok(frame) => Err(ErrorKind::NetworkFraming(format!(
+                "unparsed frame still remains {:?}",
+                frame
+            ))
+            .into()),
+            Err(ParseError::EndOfStream) => Ok(()),
+            Err(err) => Err(err.into()),
         }
     }
 

@@ -80,7 +80,9 @@ impl Client {
     pub async fn get(&mut self, key: Key) -> Result<Option<Value>> {
         let get = Get::new(key);
         self.connection.write_message(get).await?;
-
-        todo!()
+        match self.connection.read_message().await? {
+            Some(Message::Success(success)) => Ok(success.value()),
+            _ => unreachable!(),
+        }
     }
 }

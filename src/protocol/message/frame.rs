@@ -145,6 +145,7 @@ impl Frame {
                 Ok(Frame::String(string))
             }
             frameprefix::BYTES => {
+                // TODO: handle bytes contains delimiter
                 let len = cursor::get_decimal(src)? as usize;
                 let value = cursor::get_line(src)?.to_vec();
                 debug_assert_eq!(len, value.len());

@@ -52,9 +52,6 @@ impl Initializer {
             tokio::fs::create_dir_all(ns).await?;
         }
 
-        // Make sure default table exists at initialization.
-        tokio::fs::File::create(namespaces.join("default/default/default.kvs")).await?;
-
         Ok(())
     }
 }

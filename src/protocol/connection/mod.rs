@@ -155,6 +155,7 @@ mod tests {
                 Message::Authenticate(Authenticate::new("user", "pass")),
                 Message::Ping(Ping::new().record_client_time()),
                 Message::Success(Success::new()),
+                Message::Success(Success::with_value(Value::new(b"value1".as_ref()).unwrap())),
                 Message::Fail(Fail::new(FailCode::Unauthenticated)),
                 Message::Fail(
                     Fail::new(FailCode::UnexpectedMessage).with_message("unexpected message X"),

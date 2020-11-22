@@ -1,6 +1,9 @@
 mod set;
 pub(crate) use self::set::Set;
 
+mod get;
+pub(crate) use self::get::Get;
+
 use std::fmt;
 use std::sync::Arc;
 
@@ -14,12 +17,14 @@ pub(crate) enum UnitOfWork {
     Authenticate(Work<Box<dyn credential::Provider + Send>, Option<Principal>>),
     Ping(Work<(), Time>),
     Set(Work<Set, Option<Value>>),
+    Get(Work<Get, Option<Value>>),
 }
 
 pub(crate) struct Work<Req, Res> {
     pub(crate) principal: Arc<Principal>,
     pub(crate) request: Req,
-    pub(crate) response_sender: oneshot::Sender<Result<Res>>,
+    // Wrap with option so that response can be sent via mut reference.
+    pub(crate) response_sender: Option<oneshot::Sender<Result<Res>>>,
 }
 
 impl UnitOfWork {
@@ -32,7 +37,7 @@ impl UnitOfWork {
             UnitOfWork::Authenticate(Work {
                 principal,
                 request: Box::new(provider),
-                response_sender: tx,
+                response_sender: Some(tx),
             }),
             rx,
         )
@@ -46,7 +51,7 @@ impl UnitOfWork {
             UnitOfWork::Ping(Work {
                 principal,
                 request: (),
-                response_sender: tx,
+                response_sender: Some(tx),
             }),
             rx,
         )
@@ -61,7 +66,22 @@ impl UnitOfWork {
             UnitOfWork::Set(Work {
                 principal,
                 request: set,
-                response_sender: tx,
+                response_sender: Some(tx),
+            }),
+            rx,
+        )
+    }
+
+    pub(crate) fn new_get(
+        principal: Arc<Principal>,
+        get: Get,
+    ) -> (UnitOfWork, oneshot::Receiver<Result<Option<Value>>>) {
+        let (tx, rx) = oneshot::channel();
+        (
+            UnitOfWork::Get(Work {
+                principal,
+                request: get,
+                response_sender: Some(tx),
             }),
             rx,
         )
@@ -78,14 +98,10 @@ impl fmt::Debug for UnitOfWork {
                 write!(f, "Ping")
             }
             UnitOfWork::Set(set) => {
-                write!(
-                    f,
-                    "Set {namespace}/{table} {key} => {value:?}",
-                    namespace = &set.request.namespace,
-                    table = &set.request.table,
-                    key = &set.request.key,
-                    value = &set.request.value,
-                )
+                write!(f, "{}", set.request)
+            }
+            UnitOfWork::Get(get) => {
+                write!(f, "{}", get.request)
             }
         }
     }

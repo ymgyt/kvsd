@@ -117,6 +117,7 @@ impl Entry {
         mut reader: R,
     ) -> Result<(usize, Self)> {
         // Assuming reader is buffered.
+        //
         // calling order is important.
         // We can't like this for eval_order_dependence(https://rust-lang.github.io/rust-clippy/master/index.html#eval_order_dependence)
         // Header {
@@ -164,6 +165,10 @@ impl Entry {
 
     pub(super) fn take_key(self) -> String {
         self.body.key
+    }
+
+    pub(super) fn take_key_value(self) -> (String, Box<[u8]>) {
+        (self.body.key, self.body.value)
     }
 
     fn calc_crc_checksum(&self) -> u32 {
