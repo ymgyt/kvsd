@@ -145,10 +145,14 @@ impl Frame {
                 Ok(Frame::String(string))
             }
             frameprefix::BYTES => {
-                // TODO: handle bytes contains delimiter
                 let len = cursor::get_decimal(src)? as usize;
-                let value = cursor::get_line(src)?.to_vec();
-                debug_assert_eq!(len, value.len());
+                let n = len + 2;
+                if src.remaining() < n {
+                    return Err(Error::Incomplete);
+                }
+                let value = Vec::from(&src.bytes()[..len]);
+
+                cursor::skip(src, n)?;
 
                 Ok(Frame::Bytes(value))
             }
