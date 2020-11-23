@@ -4,6 +4,9 @@ pub(crate) use self::set::Set;
 mod get;
 pub(crate) use self::get::Get;
 
+mod delete;
+pub(crate) use self::delete::Delete;
+
 use std::fmt;
 use std::sync::Arc;
 
@@ -18,6 +21,7 @@ pub(crate) enum UnitOfWork {
     Ping(Work<(), Time>),
     Set(Work<Set, Option<Value>>),
     Get(Work<Get, Option<Value>>),
+    Delete(Work<Delete, Option<Value>>),
 }
 
 pub(crate) struct Work<Req, Res> {
@@ -96,6 +100,21 @@ impl UnitOfWork {
             rx,
         )
     }
+
+    pub(crate) fn new_delete(
+        principal: Arc<Principal>,
+        delete: Delete,
+    ) -> (UnitOfWork, oneshot::Receiver<Result<Option<Value>>>) {
+        let (tx, rx) = oneshot::channel();
+        (
+            UnitOfWork::Delete(Work {
+                principal,
+                request: delete,
+                response_sender: Some(tx),
+            }),
+            rx,
+        )
+    }
 }
 
 impl fmt::Debug for UnitOfWork {
@@ -112,6 +131,9 @@ impl fmt::Debug for UnitOfWork {
             }
             UnitOfWork::Get(get) => {
                 write!(f, "{}", get.request)
+            }
+            UnitOfWork::Delete(delete) => {
+                write!(f, "{}", delete.request)
             }
         }
     }

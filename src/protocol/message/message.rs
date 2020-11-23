@@ -1,7 +1,9 @@
 use std::convert::TryFrom;
 
 use crate::common::{Error, ErrorKind, Result};
-use crate::protocol::message::{Authenticate, Fail, Get, MessageFrames, Parse, Ping, Set, Success};
+use crate::protocol::message::{
+    Authenticate, Delete, Fail, Get, MessageFrames, Parse, Ping, Set, Success,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MessageType {
@@ -11,6 +13,7 @@ pub(crate) enum MessageType {
     Fail = 4,
     Set = 5,
     Get = 6,
+    Delete = 7,
 }
 
 impl Into<u8> for MessageType {
@@ -29,6 +32,7 @@ impl TryFrom<u8> for MessageType {
             4 => Ok(MessageType::Fail),
             5 => Ok(MessageType::Set),
             6 => Ok(MessageType::Get),
+            7 => Ok(MessageType::Delete),
             _ => Err(Error::from(ErrorKind::UnknownMessageType {
                 message_type: n,
             })),
@@ -44,6 +48,7 @@ pub(crate) enum Message {
     Fail(Fail),
     Set(Set),
     Get(Get),
+    Delete(Delete),
 }
 
 impl Message {
@@ -62,6 +67,7 @@ impl Message {
             MessageType::Fail => Message::Fail(Fail::parse_frames(&mut parse)?),
             MessageType::Set => Message::Set(Set::parse_frames(&mut parse)?),
             MessageType::Get => Message::Get(Get::parse_frames(&mut parse)?),
+            MessageType::Delete => Message::Delete(Delete::parse_frames(&mut parse)?),
         };
 
         Ok(message)
@@ -77,6 +83,7 @@ impl Into<MessageFrames> for Message {
             Message::Fail(m) => m.into(),
             Message::Set(m) => m.into(),
             Message::Get(m) => m.into(),
+            Message::Delete(m) => m.into(),
         }
     }
 }

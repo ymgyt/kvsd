@@ -1,3 +1,4 @@
+pub mod delete;
 pub mod get;
 pub mod ping;
 pub mod server;
@@ -12,6 +13,7 @@ pub const PING: &str = "ping";
 pub const SERVER: &str = "server";
 pub const SET: &str = "set";
 pub const GET: &str = "get";
+pub const DELETE: &str = "delete";
 
 pub(super) const MUST_ARG_HOST: &str = "host";
 pub(super) const MUST_ARG_PORT: &str = "port";
@@ -60,6 +62,7 @@ pub fn new() -> App<'static, 'static> {
         .subcommand(cli::server::subcommand())
         .subcommand(cli::set::subcommand())
         .subcommand(cli::get::subcommand())
+        .subcommand(cli::delete::subcommand())
         .settings(&[
             AppSettings::SubcommandRequiredElseHelp,
             AppSettings::VersionlessSubcommands,

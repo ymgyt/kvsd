@@ -41,7 +41,7 @@ struct Header {
 #[derive(PartialEq, Debug)]
 struct Body {
     key: String,
-    value: Box<[u8]>,
+    value: Option<Box<[u8]>>,
 }
 
 impl TryFrom<KeyValue> for Entry {
@@ -70,13 +70,24 @@ impl Entry {
 
         let body = Body {
             key: key.into_string(),
-            value: value.into_boxed_bytes(),
+            value: Some(value.into_boxed_bytes()),
         };
 
         let mut entry = Self { header, body };
         entry.header.crc_checksum = Some(entry.calc_crc_checksum());
 
         Ok(entry)
+    }
+
+    pub(super) fn mark_deleted(&mut self) -> Option<Box<[u8]>> {
+        let value = self.body.value.take();
+
+        self.header.value_bytes = 0;
+        self.header.timestamp_ms = Utc::now().timestamp_millis();
+        self.header.state = State::Deleted;
+        self.header.crc_checksum = Some(self.calc_crc_checksum());
+
+        value
     }
 
     fn try_from_key_value<T>(kv: T) -> Result<Self>
@@ -106,7 +117,9 @@ impl Entry {
 
         // Body
         writer.write_all(self.body.key.as_bytes()).await?;
-        writer.write_all(self.body.value.as_ref()).await?;
+        if let Some(value) = &self.body.value {
+            writer.write_all(value).await?;
+        }
         n += self.body.len();
 
         Ok(n)
@@ -148,19 +161,27 @@ impl Entry {
             .await?;
 
         let value = buf.split_off(header.key_bytes);
+
         let key = String::from_utf8(buf).map_err(|e| ErrorKind::EntryDecode {
             description: e.to_string(),
         })?;
 
+        let value = if !value.is_empty() {
+            Some(value.into_boxed_slice())
+        } else {
+            None
+        };
+
         let entry = Self {
             header,
-            body: Body {
-                key,
-                value: value.into_boxed_slice(),
-            },
+            body: Body { key, value },
         };
 
         Ok((entry.encoded_len(), entry))
+    }
+
+    pub(super) fn is_active(&self) -> bool {
+        self.header.state == State::Active
     }
 
     pub(super) fn take_key(self) -> String {
@@ -168,7 +189,7 @@ impl Entry {
     }
 
     pub(super) fn take_key_value(self) -> (String, Box<[u8]>) {
-        (self.body.key, self.body.value)
+        (self.body.key, self.body.value.unwrap())
     }
 
     fn calc_crc_checksum(&self) -> u32 {
@@ -183,15 +204,18 @@ impl Entry {
             .as_ref(),
         );
 
+        h.update((self.header.state as u8).to_be_bytes().as_ref());
         h.update(self.body.key.as_bytes());
-        h.update(self.body.value.as_ref());
+        if let Some(value) = &self.body.value {
+            h.update(value);
+        }
         h.finalize()
     }
 
     // Assert entry data consistency.
     fn assert(&self) -> bool {
         self.header.key_bytes == self.body.key.len()
-            && self.header.value_bytes == self.body.value.len()
+            && self.header.value_bytes == self.body.value.as_ref().map(|v| v.len()).unwrap_or(0)
             && self.header.crc_checksum.unwrap_or(0) == self.calc_crc_checksum()
     }
 
@@ -219,7 +243,11 @@ impl Header {
 
 impl Body {
     fn len(&self) -> usize {
-        self.key.len() + self.value.len()
+        self.key.len()
+            + match &self.value {
+                Some(value) => value.len(),
+                None => 0,
+            }
     }
 }
 
@@ -256,10 +284,30 @@ mod tests {
     }
 
     #[test]
+    fn delete() {
+        tokio_test::block_on(async move {
+            let mut entry1 = Entry::try_from_key_value(("kv1", "value1")).unwrap();
+            entry1.mark_deleted();
+
+            let mut buf = Cursor::new(Vec::new());
+            entry1.encode_to(&mut buf).await.unwrap();
+
+            buf.set_position(0);
+
+            let (_, decoded) = Entry::decode_from(&mut buf).await.unwrap();
+
+            assert_eq!(entry1, decoded);
+            assert_eq!(decoded.header.state, State::Deleted);
+        })
+    }
+
+    #[test]
     fn construct_index() {
         tokio_test::block_on(async move {
-            let entry1 = Entry::try_from_key_value(("kv1", "value1")).unwrap();
+            let mut entry1 = Entry::try_from_key_value(("key1", "value1")).unwrap();
             let entry2 = Entry::try_from_key_value(("key2", "value2")).unwrap();
+
+            entry1.mark_deleted();
 
             let mut buf = Cursor::new(Vec::new());
             entry1.encode_to(&mut buf).await.unwrap();
@@ -274,6 +322,8 @@ mod tests {
 
             let (_, decoded) = Entry::decode_from(&mut buf).await.unwrap();
             assert_eq!(entry2, decoded);
+
+            assert_eq!(None, index.lookup_offset("key1"))
         })
     }
 }

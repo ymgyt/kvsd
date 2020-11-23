@@ -83,6 +83,10 @@ impl Value {
         }
     }
 
+    pub(crate) fn new_unchecked(v: impl Into<Box<[u8]>>) -> Self {
+        Value(v.into())
+    }
+
     pub fn into_boxed_bytes(self) -> Box<[u8]> {
         self.0
     }

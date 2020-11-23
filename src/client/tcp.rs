@@ -1,7 +1,7 @@
 use tokio::net::{TcpStream, ToSocketAddrs};
 
 use crate::protocol::connection::Connection;
-use crate::protocol::message::{Authenticate, Get, Message, Ping, Set};
+use crate::protocol::message::{Authenticate, Delete, Get, Message, Ping, Set};
 use crate::protocol::{Key, Value};
 use crate::{KvsError, Result};
 
@@ -80,6 +80,15 @@ impl Client {
     pub async fn get(&mut self, key: Key) -> Result<Option<Value>> {
         let get = Get::new(key);
         self.connection.write_message(get).await?;
+        match self.connection.read_message().await? {
+            Some(Message::Success(success)) => Ok(success.value()),
+            _ => unreachable!(),
+        }
+    }
+
+    pub async fn delete(&mut self, key: Key) -> Result<Option<Value>> {
+        let delete = Delete::new(key);
+        self.connection.write_message(delete).await?;
         match self.connection.read_message().await? {
             Some(Message::Success(success)) => Ok(success.value()),
             _ => unreachable!(),

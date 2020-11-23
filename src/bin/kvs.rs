@@ -45,6 +45,7 @@ async fn run_inner() -> kvs::Result<()> {
         (cli::SERVER, Some(sm)) => cli::server::run(sm).await,
         (cli::SET, Some(sm)) => cli::set::run(sm).await,
         (cli::GET, Some(sm)) => cli::get::run(sm).await,
+        (cli::DELETE, Some(sm)) => cli::delete::run(sm).await,
         (_, _) => unreachable!(),
     }
 }

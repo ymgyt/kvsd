@@ -62,6 +62,12 @@ impl Middleware for Dispatcher {
                     Err(err) => get.send_response(Err(err)),
                 }
             }
+            UnitOfWork::Delete(ref mut delete) => {
+                match self.lookup_table(&delete.request.namespace, &delete.request.table) {
+                    Ok(sender) => Ok(sender.send(uow).await?),
+                    Err(err) => delete.send_response(Err(err)),
+                }
+            }
             _ => unreachable!(),
         }
     }

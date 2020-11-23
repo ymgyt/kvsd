@@ -59,7 +59,8 @@ where
             }
             UnitOfWork::Ping(Work { ref principal, .. })
             | UnitOfWork::Set(Work { ref principal, .. })
-            | UnitOfWork::Get(Work { ref principal, .. }) => {
+            | UnitOfWork::Get(Work { ref principal, .. })
+            | UnitOfWork::Delete(Work { ref principal, .. }) => {
                 let r = self.check_principal(principal.as_ref());
 
                 match r {

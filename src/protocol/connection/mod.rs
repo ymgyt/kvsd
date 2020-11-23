@@ -140,7 +140,7 @@ where
 mod tests {
     use super::*;
     use crate::protocol::message::{
-        Authenticate, Fail, FailCode, Get, Message, Ping, Set, Success,
+        Authenticate, Delete, Fail, FailCode, Get, Message, Ping, Set, Success,
     };
     use crate::protocol::{Key, Value};
 
@@ -168,6 +168,7 @@ mod tests {
                     Value::new(b"value1".as_ref()).unwrap(),
                 )),
                 Message::Get(Get::new(Key::new("key1").unwrap())),
+                Message::Delete(Delete::new(Key::new("key1").unwrap())),
             ];
             let messages_clone = messages.clone();
 

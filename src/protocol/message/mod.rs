@@ -25,4 +25,7 @@ pub(crate) use set::Set;
 mod get;
 pub(crate) use get::Get;
 
+mod delete;
+pub(crate) use delete::Delete;
+
 pub(crate) const DELIMITER: &[u8] = b"\r\n";
