@@ -55,3 +55,4 @@ $ KVS_LOG=info kvs
 - [ ] Remove `unreachable!() macro`
 - [ ] Use derive to reduce message/uow boiler plate code
 - [ ] Closing files during graceful shutdown
+- [ ] Add Benchmark
