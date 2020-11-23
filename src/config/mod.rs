@@ -1,8 +1,8 @@
 mod initialize;
-pub(crate) use initialize::Initializer;
+pub use self::initialize::Initializer;
 
 mod config;
-pub(crate) use config::Config;
+pub use self::config::Config;
 
 pub(crate) mod filepath {
     pub const NAMESPACES: &str = "namespaces";

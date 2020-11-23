@@ -92,13 +92,16 @@ pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
         .server
         .override_merge(&mut read_server_config(m));
 
-    initializer.config.kvs.root_dir = Some(root_dir);
+    initializer.set_root_dir(root_dir);
 
     debug!("{:?}", initializer);
 
     initializer.init_dir().await?;
 
-    initializer.run_kvs().await.map_err(KvsError::from)
+    initializer
+        .run_kvs(tokio::signal::ctrl_c())
+        .await
+        .map_err(KvsError::from)
 }
 
 fn read_server_config(m: &ArgMatches<'_>) -> ServerConfig {

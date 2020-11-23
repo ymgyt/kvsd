@@ -1,16 +1,18 @@
 #![allow(clippy::module_inception)]
 
-mod client;
-mod config;
-mod core;
 mod server;
 
 pub mod cli;
+pub mod client;
+pub mod config;
+pub mod core;
 pub mod error;
 pub mod protocol;
 
 pub use crate::error::KvsError;
 pub type Result<T, E = crate::error::KvsError> = std::result::Result<T, E>;
+
+pub use protocol::{Key, Value};
 
 pub(crate) mod common {
     pub(crate) type Result<T, E = crate::error::internal::Error> = std::result::Result<T, E>;

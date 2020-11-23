@@ -2,7 +2,7 @@ mod kvs;
 pub(crate) use self::kvs::Builder;
 
 mod config;
-pub(crate) use self::config::{Config, UserEntry};
+pub use self::config::{Config, UserEntry};
 
 mod table;
 

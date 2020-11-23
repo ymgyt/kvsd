@@ -51,7 +51,7 @@ $ KVS_LOG=info kvs
 
 ## TODO
 
+- [ ] Support TLS connection.
 - [ ] Remove `unreachable!() macro`
-- [ ] Add integration tests
 - [ ] Use derive to reduce message/uow boiler plate code
 - [ ] Closing files during graceful shutdown

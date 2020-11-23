@@ -1,0 +1,3 @@
+[tasks.integration]
+command = "cargo"
+args = ["test", "--test", "integration_test", "--",  "--nocapture"]

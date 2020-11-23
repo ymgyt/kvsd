@@ -14,10 +14,11 @@ use crate::core::uow::{Delete, Get, Set};
 use crate::core::{Principal, UnitOfWork};
 use crate::protocol::connection::Connection;
 use crate::protocol::message::{Fail, FailCode, Message, Success};
+use std::future::Future;
 
 // Server configuration.
 #[derive(Debug, Deserialize, Default)]
-pub(crate) struct Config {
+pub struct Config {
     // Max tcp connections.
     max_tcp_connections: Option<u32>,
     // Size of buffer allocated per tcp connection.
@@ -91,7 +92,7 @@ impl Config {
         )
     }
 
-    fn listen_addr(&self) -> String {
+    pub(crate) fn listen_addr(&self) -> String {
         format!(
             "{}:{}",
             self.listen_host
@@ -154,19 +155,19 @@ impl Server {
     }
 
     // Utility serve wrapper for handle systemcalls.
-    pub(crate) async fn run(mut self, request_sender: mpsc::Sender<UnitOfWork>) -> Result<()> {
-        let addr = self.config.listen_addr();
-        info!(%addr, "Listening...");
-
-        let listener = tokio::net::TcpListener::bind(addr).await?;
-
+    pub(crate) async fn run(
+        mut self,
+        request_sender: mpsc::Sender<UnitOfWork>,
+        listener: TcpListener,
+        shutdown: impl Future,
+    ) -> Result<()> {
         tokio::select! {
             result = self.serve(listener, request_sender) => {
                 if let Err(err) = result {
                     error!(cause = %err, "Failed to accept");
                 }
             }
-            _ = tokio::signal::ctrl_c() => {
+            _ = shutdown => {
                 info!("Shutdown signal received");
             }
         }
