@@ -1,9 +1,9 @@
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 use chrono::Utc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::common::{Error, ErrorKind, KvsError, Result};
+use crate::common::{Error, ErrorKind, Result};
 use crate::protocol::{Key, KeyValue, Value};
 
 // Entry represent unit of data that is subject to an operation.
@@ -88,14 +88,6 @@ impl Entry {
         self.header.crc_checksum = Some(self.calc_crc_checksum());
 
         value
-    }
-
-    fn try_from_key_value<T>(kv: T) -> Result<Self>
-    where
-        T: TryInto<KeyValue, Error = KvsError>,
-    {
-        let kv = kv.try_into()?;
-        Entry::try_from(kv)
     }
 
     // Write binary expression to writer.
@@ -257,9 +249,17 @@ mod tests {
     use crate::core::table::index::Index;
     use std::io::Cursor;
 
+    fn try_from_key_value<T>(kv: T) -> Result<Entry>
+    where
+        T: TryInto<KeyValue, Error = KvsError>,
+    {
+        let kv = kv.try_into()?;
+        Entry::try_from(kv)
+    }
+
     #[test]
     fn from_key_value() {
-        let entry = Entry::try_from_key_value(("key", b"hello")).unwrap();
+        let entry = try_from_key_value(("key", b"hello")).unwrap();
 
         assert_eq!(entry.header.key_bytes, 3);
         assert_eq!(entry.header.value_bytes, 5);
@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn encode_decode() {
         tokio_test::block_on(async move {
-            let entry = Entry::try_from_key_value(("key", "hello")).unwrap();
+            let entry = try_from_key_value(("key", "hello")).unwrap();
 
             let mut buf = Cursor::new(Vec::new());
             let written = entry.encode_to(&mut buf).await.unwrap();
@@ -286,7 +286,7 @@ mod tests {
     #[test]
     fn delete() {
         tokio_test::block_on(async move {
-            let mut entry1 = Entry::try_from_key_value(("kv1", "value1")).unwrap();
+            let mut entry1 = try_from_key_value(("kv1", "value1")).unwrap();
             entry1.mark_deleted();
 
             let mut buf = Cursor::new(Vec::new());
@@ -304,8 +304,8 @@ mod tests {
     #[test]
     fn construct_index() {
         tokio_test::block_on(async move {
-            let mut entry1 = Entry::try_from_key_value(("key1", "value1")).unwrap();
-            let entry2 = Entry::try_from_key_value(("key2", "value2")).unwrap();
+            let mut entry1 = try_from_key_value(("key1", "value1")).unwrap();
+            let entry2 = try_from_key_value(("key2", "value2")).unwrap();
 
             entry1.mark_deleted();
 

@@ -20,13 +20,18 @@ pub(crate) struct Error {
 pub(crate) enum ErrorKind {
     Io(io::Error),
     Yaml(serde_yaml::Error),
-    EntryDecode { description: String },
-    UnknownMessageType { message_type: u8 },
+    EntryDecode {
+        description: String,
+    },
+    UnknownMessageType {
+        message_type: u8,
+    },
     // Unintentional disconnection.
     ConnectionResetByPeer,
     NetworkFraming(String),
     Kvs(KvsError),
-    Unauthorized(String),
+    #[allow(dead_code)]
+    Unauthorized(String), // not implemented yet :(
     Unauthenticated,
     TableNotFound(String),
     Internal(String), // Box<dyn std::error::Error + Send + 'static> does not work :(

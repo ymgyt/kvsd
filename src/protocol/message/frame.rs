@@ -9,7 +9,6 @@ use crate::protocol::message::{MessageType, DELIMITER};
 pub(crate) enum Frame {
     MessageType(MessageType),
     String(String),
-    U64(u64),
     Bytes(Vec<u8>),
     Time(Time),
     Null,
@@ -184,13 +183,6 @@ impl IntoIterator for MessageFrames {
 // cursor utilities.
 mod cursor {
     use super::*;
-
-    pub(super) fn peek_u8(src: &mut ByteCursor) -> Result<u8, Error> {
-        if !src.has_remaining() {
-            return Err(Error::Incomplete);
-        }
-        Ok(src.bytes()[0])
-    }
 
     pub(super) fn get_u8(src: &mut ByteCursor) -> Result<u8, Error> {
         if !src.has_remaining() {

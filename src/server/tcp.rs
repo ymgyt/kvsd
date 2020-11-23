@@ -427,6 +427,7 @@ impl SemaphoreListener {
 }
 
 // Tcp listener to manage connection limits.
+#[allow(dead_code)]
 struct MaxConnAwareListener {
     inner: TcpListener,
     max_connections: u32,
@@ -435,6 +436,7 @@ struct MaxConnAwareListener {
     sender: mpsc::Sender<()>,
 }
 
+#[allow(dead_code)]
 impl MaxConnAwareListener {
     // Construct and dispatch handler done watcher.
     fn new(listener: TcpListener, max_connections: u32) -> Self {

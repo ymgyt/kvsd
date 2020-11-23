@@ -24,10 +24,6 @@ impl Success {
         Ok(Self { value })
     }
 
-    pub(crate) fn take_value(&mut self) -> Option<Value> {
-        self.value.take()
-    }
-
     pub(crate) fn value(self) -> Option<Value> {
         self.value
     }

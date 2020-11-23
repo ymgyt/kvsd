@@ -65,7 +65,6 @@ where
             Frame::Null => {
                 self.stream.write_u8(frameprefix::NULL).await?;
             }
-            _ => unreachable!(),
         }
 
         Ok(())

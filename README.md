@@ -28,3 +28,9 @@ To specify logging directive, use `KVS_LOG` environment variable.
 $ KVS_LOG=info kvs 
 ```
 
+## TODO
+
+- [ ] Remove `unreachable!() macro`
+- [ ] Add integration tests
+- [ ] Use derive to reduce message/uow boiler plate code
+- [ ] Closing files during graceful shutdown
