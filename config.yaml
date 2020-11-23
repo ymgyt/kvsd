@@ -7,5 +7,5 @@ server:
 
 kvs:
   users:
-    - username: "root"
+    - username: "kvsuser"
       password: "secret"

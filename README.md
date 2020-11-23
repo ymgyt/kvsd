@@ -2,6 +2,27 @@
 
 Simple Key Value store.
 
+## Quick Start
+
+terminal1
+```
+# running server (default port: 7379)
+$ kvs server
+```
+
+terminal2
+```
+# running client
+$ kvs set key1 value1
+OK
+
+$ kvs get key1
+value1
+
+$ kvs delete key1
+OK old value: value1
+```
+
 ## Configurations
 
 The order of configuration priority is as follows.(high to low)
