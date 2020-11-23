@@ -246,8 +246,10 @@ impl Body {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::table::index::Index;
     use std::io::Cursor;
+    use std::convert::TryInto;
+    use crate::KvsError;
+    use crate::core::table::index::Index;
 
     fn try_from_key_value<T>(kv: T) -> Result<Entry>
     where
