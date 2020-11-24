@@ -3,7 +3,6 @@ name = "kvs"
 version = "0.1.0"
 authors = ["ymgyt <yamaguchi7073xtt@gmail.com>"]
 edition = "2018"
-license = "MIT"
 license-file = "LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -28,6 +27,7 @@ serde_yaml = "0.8.14"
 serde = "1.0.117"
 rand = "0.7.3"
 async-trait = "0.1.41"
+tokio-rustls = { version = "0.20.0", features = ["dangerous_configuration"] }
 
 [dev-dependencies]
 tokio-test = "0.3.0"

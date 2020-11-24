@@ -16,6 +16,8 @@ const ARG_CONFIG_PATH: &str = "server_config_path";
 const ARG_HOST: &str = "server_host";
 const ARG_PORT: &str = "server_port";
 const MUST_ARG_KVS_DIR: &str = "kvs_dir";
+const MUST_ARG_TLS_CERT: &str = "tls_cert";
+const MUST_ARG_TLS_KEY: &str = "tls_key";
 
 pub(super) fn subcommand() -> App<'static, 'static> {
     SubCommand::with_name(SERVER)
@@ -45,7 +47,7 @@ pub(super) fn subcommand() -> App<'static, 'static> {
             Arg::with_name(ARG_CONFIG_PATH)
                 .long("config")
                 .short("C")
-                .default_value("./config.yaml")
+                .default_value("./files/config.yaml")
                 .takes_value(true)
                 .env("KVS_SERVER_CONFIG_PATH")
                 .help("Configuration file path"),
@@ -71,6 +73,22 @@ pub(super) fn subcommand() -> App<'static, 'static> {
                 .default_value(".kvs")
                 .env("KVS_DIR")
                 .help("root directory where kvs store it's data"),
+        )
+        .arg(
+            Arg::with_name(MUST_ARG_TLS_CERT)
+                .long("cert")
+                .takes_value(true)
+                .default_value("./files/localhost.pem")
+                .env("KVS_TLS_CERT")
+                .help("tls server certificate file path"),
+        )
+        .arg(
+            Arg::with_name(MUST_ARG_TLS_KEY)
+                .long("key")
+                .takes_value(true)
+                .default_value("./files/localhost.key")
+                .env("KVS_TLS_KEY")
+                .help("tls server private key file path"),
         )
 }
 
@@ -118,6 +136,8 @@ fn read_server_config(m: &ArgMatches<'_>) -> ServerConfig {
     );
     config.set_listen_host(&mut m.value_of(ARG_HOST).map(String::from));
     config.set_listen_port(&mut m.value_of(ARG_PORT).map(String::from));
+    config.set_tls_certificate(&mut m.value_of(MUST_ARG_TLS_CERT).map(String::from));
+    config.set_tls_key(&mut m.value_of(MUST_ARG_TLS_KEY).map(String::from));
 
     config
 }

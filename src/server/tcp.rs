@@ -1,20 +1,23 @@
+use std::future::Future;
 use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc,
 };
 
 use serde::Deserialize;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc, Semaphore};
 use tokio::time::{timeout, Duration};
+use tokio_rustls::rustls;
+use tokio_rustls::server::TlsStream;
+use tokio_rustls::TlsAcceptor;
 
 use crate::common::{error, info, trace, warn, Result};
 use crate::core::uow::{Delete, Get, Set};
 use crate::core::{Principal, UnitOfWork};
 use crate::protocol::connection::Connection;
 use crate::protocol::message::{Fail, FailCode, Message, Success};
-use std::future::Future;
 
 // Server configuration.
 #[derive(Debug, Deserialize, Default)]
@@ -29,6 +32,10 @@ pub struct Config {
     listen_host: Option<String>,
     // tcp listen port.
     listen_port: Option<String>,
+    // tls server certificate file path
+    tls_certificate: Option<String>,
+    // tls server private key file path
+    tls_key: Option<String>,
 }
 
 impl Config {
@@ -63,12 +70,24 @@ impl Config {
             self.listen_port = Some(val)
         }
     }
+    pub(crate) fn set_tls_certificate(&mut self, val: &mut Option<String>) {
+        if let Some(val) = val.take() {
+            self.tls_certificate = Some(val)
+        }
+    }
+    pub(crate) fn set_tls_key(&mut self, val: &mut Option<String>) {
+        if let Some(val) = val.take() {
+            self.tls_key = Some(val)
+        }
+    }
     pub(crate) fn override_merge(&mut self, other: &mut Config) {
         self.set_max_tcp_connections(other.max_tcp_connections);
         self.set_connection_tcp_buffer_bytes(other.connection_tcp_buffer_bytes);
         self.set_authenticate_timeout_milliseconds(other.authenticate_timeout_milliseconds);
         self.set_listen_host(&mut other.listen_host);
         self.set_listen_port(&mut other.listen_port);
+        self.set_tls_certificate(&mut other.tls_certificate);
+        self.set_tls_key(&mut other.tls_key);
     }
 
     fn max_tcp_connections(&self) -> u32 {
@@ -102,6 +121,22 @@ impl Config {
                 .as_deref()
                 .unwrap_or(Config::DEFAULT_LISTEN_PORT),
         )
+    }
+
+    // TODO: handle err
+    fn load_certs(&self) -> Vec<rustls::Certificate> {
+        rustls::internal::pemfile::certs(&mut std::io::BufReader::new(
+            std::fs::File::open(self.tls_certificate.clone().unwrap()).unwrap(),
+        ))
+        .unwrap()
+    }
+
+    // TODO: handle err
+    fn load_keys(&self) -> Vec<rustls::PrivateKey> {
+        rustls::internal::pemfile::pkcs8_private_keys(&mut std::io::BufReader::new(
+            std::fs::File::open(self.tls_key.clone().unwrap()).unwrap(),
+        ))
+        .unwrap()
     }
 }
 
@@ -154,7 +189,6 @@ impl Server {
         }
     }
 
-    // Utility serve wrapper for handle systemcalls.
     pub(crate) async fn run(
         mut self,
         request_sender: mpsc::Sender<UnitOfWork>,
@@ -188,39 +222,70 @@ impl Server {
     ) -> Result<()> {
         info!("Server running. {:?}", self.config);
 
+        // Setup TLS
+        // TODO: def tls setup method
+        let mut tls_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
+
+        let certs = self.config.load_certs();
+        let mut keys = self.config.load_keys();
+        tls_config.set_single_cert(certs, keys.remove(0)).unwrap();
+
+        let tls_acceptor = TlsAcceptor::from(Arc::new(tls_config));
+
         let mut listener = SemaphoreListener::new(listener, self.config.max_tcp_connections());
 
         loop {
-            let (socket, addr) = listener.accept().await?;
+            let (socket, peer_addr) = listener.accept().await?;
             info!(
                 available = listener.max_connections.available_permits(),
                 "Connection accepted"
             );
 
-            let connection =
-                Connection::new(socket, Some(self.config.connection_tcp_buffer_bytes()));
+            let acceptor = tls_acceptor.clone();
+            let conn_tcp_buffer_bytes = self.config.connection_tcp_buffer_bytes();
 
-            let handler = Handler::new(
-                connection,
-                request_sender.clone(),
-                ShutdownSubscriber::new(
+            let mut handler = Handler {
+                principal: Arc::new(Principal::AnonymousUser),
+                remote_addr: Some(peer_addr),
+                request_sender: request_sender.clone(),
+                shutdown: ShutdownSubscriber::new(
                     self.graceful_shutdown.notify_shutdown.subscribe(),
                     self.graceful_shutdown.shutdown_complete_tx.clone(),
                 ),
-                listener.max_connections.clone(),
-                self.config.authenticate_timeout(),
-            )
-            .with_socket_addr(addr);
+                max_connections: listener.max_connections.clone(),
+                authenticate_timeout: self.config.authenticate_timeout(),
+            };
 
-            tokio::spawn(handler.handle());
+            tokio::spawn(async move {
+                let connection =
+                    match Server::handshake(acceptor, socket, conn_tcp_buffer_bytes).await {
+                        Ok(connection) => connection,
+                        Err(err) => {
+                            error!("TLS: {}", err);
+                            return;
+                        }
+                    };
+
+                if let Err(err) = handler.handle(connection).await {
+                    error!("{}", err);
+                }
+            });
         }
+    }
+
+    async fn handshake(
+        acceptor: TlsAcceptor,
+        stream: TcpStream,
+        buffer_bytes: usize,
+    ) -> Result<Connection<TlsStream<TcpStream>>> {
+        let tls_stream = acceptor.accept(stream).await?;
+        Ok(Connection::new(tls_stream, Some(buffer_bytes)))
     }
 }
 
 struct Handler {
     principal: Arc<Principal>,
     remote_addr: Option<std::net::SocketAddr>,
-    connection: Connection,
     request_sender: mpsc::Sender<UnitOfWork>,
     shutdown: ShutdownSubscriber,
     max_connections: Arc<Semaphore>,
@@ -228,47 +293,22 @@ struct Handler {
 }
 
 impl Handler {
-    fn new(
-        connection: Connection,
-        request_sender: mpsc::Sender<UnitOfWork>,
-        shutdown: ShutdownSubscriber,
-        max_connections: Arc<Semaphore>,
-        authenticate_timeout: Duration,
-    ) -> Self {
-        Self {
-            principal: Arc::new(Principal::AnonymousUser),
-            connection,
-            remote_addr: None,
-            request_sender,
-            shutdown,
-            max_connections,
-            authenticate_timeout,
+    async fn handle<T>(&mut self, mut conn: Connection<T>) -> Result<()>
+    where
+        T: AsyncWrite + AsyncRead + Unpin,
+    {
+        if self.authenticate(&mut conn).await? {
+            self.handle_message(&mut conn).await
+        } else {
+            Ok(())
         }
     }
 
-    fn with_socket_addr(mut self, addr: std::net::SocketAddr) -> Self {
-        self.remote_addr = Some(addr);
-        self
-    }
-
-    async fn handle(mut self) {
-        match self.authenticate().await {
-            // Successfully client authenticated.
-            Ok(true) => {
-                if let Err(err) = self.handle_message().await {
-                    error!(?self.remote_addr, "Handle message {}", err);
-                }
-            }
-            // Authentication failed, do nothing, just close connection.
-            Ok(false) => (),
-            Err(err) if err.is_timeout() => warn!("authentication timeout {}", err),
-            Err(err) => error!("{}", err),
-        }
-    }
-
-    async fn authenticate(&mut self) -> Result<bool> {
-        match self
-            .connection
+    async fn authenticate<T>(&mut self, connection: &mut Connection<T>) -> Result<bool>
+    where
+        T: AsyncWrite + AsyncRead + Unpin,
+    {
+        match connection
             .read_message_with_timeout(self.authenticate_timeout)
             .await?
         {
@@ -281,12 +321,12 @@ impl Handler {
                 match auth_result {
                     Some(principal) => {
                         self.principal = Arc::new(principal);
-                        self.connection.write_message(Success::new()).await?;
+                        connection.write_message(Success::new()).await?;
                         Ok(true)
                     }
                     None => {
                         info!(addr=?self.remote_addr, "unauthenticated {:?}", auth);
-                        self.connection
+                        connection
                             .write_message(Fail::from(FailCode::Unauthenticated))
                             .await?;
                         Ok(false)
@@ -301,11 +341,14 @@ impl Handler {
         }
     }
 
-    async fn handle_message(&mut self) -> Result<()> {
+    async fn handle_message<T>(&mut self, connection: &mut Connection<T>) -> Result<()>
+    where
+        T: AsyncWrite + AsyncRead + Unpin,
+    {
         // select! can't detect shutdown reliably, so explicitly check shutdown before tcp read.
         while !self.shutdown.is_shutdown() {
             let maybe_message = tokio::select! {
-                msg = self.connection.read_message() => msg?,
+                msg = connection.read_message() => msg?,
                 _ = self.shutdown.recv() => {
                     return Ok(())
                 }
@@ -327,10 +370,10 @@ impl Handler {
                     match ping_result {
                         Ok(time) => {
                             ping.record_server_time(time);
-                            self.connection.write_message(ping).await?;
+                            connection.write_message(ping).await?;
                         }
                         Err(err) if err.is_unauthorized() => {
-                            self.connection
+                            connection
                                 .write_message(Fail::new(FailCode::Unauthenticated))
                                 .await?;
                         }
@@ -350,7 +393,7 @@ impl Handler {
 
                     match rx.await? {
                         // TODO: write back previous value.
-                        Ok(_) => self.connection.write_message(Success::new()).await?,
+                        Ok(_) => connection.write_message(Success::new()).await?,
                         _ => todo!(),
                     }
                 }
@@ -365,11 +408,9 @@ impl Handler {
 
                     match rx.await? {
                         Ok(Some(value)) => {
-                            self.connection
-                                .write_message(Success::with_value(value))
-                                .await?
+                            connection.write_message(Success::with_value(value)).await?
                         }
-                        Ok(None) => self.connection.write_message(Success::new()).await?,
+                        Ok(None) => connection.write_message(Success::new()).await?,
                         _ => unreachable!(),
                     }
                 }
@@ -384,11 +425,9 @@ impl Handler {
 
                     match rx.await? {
                         Ok(Some(value)) => {
-                            self.connection
-                                .write_message(Success::with_value(value))
-                                .await?
+                            connection.write_message(Success::with_value(value)).await?
                         }
-                        Ok(None) => self.connection.write_message(Success::new()).await?,
+                        Ok(None) => connection.write_message(Success::new()).await?,
                         _ => unreachable!(),
                     }
                 }

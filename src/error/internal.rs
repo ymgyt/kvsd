@@ -143,6 +143,7 @@ impl Error {
         matches!(self.kind, ErrorKind::Unauthorized(_))
     }
 
+    #[allow(dead_code)]
     pub fn is_timeout(&self) -> bool {
         if let ErrorKind::Io(err) = self.kind() {
             err.kind().eq(&io::ErrorKind::TimedOut)

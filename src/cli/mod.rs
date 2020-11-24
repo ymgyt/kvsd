@@ -28,7 +28,7 @@ pub fn new() -> App<'static, 'static> {
             Arg::with_name(MUST_ARG_HOST)
                 .long("host")
                 .env("KVS_HOST")
-                .default_value("localhost")
+                .default_value("127.0.0.1")
                 .help("Remote kvs server host")
                 .global(true),
         )
@@ -71,20 +71,25 @@ pub fn new() -> App<'static, 'static> {
         .global_settings(&[AppSettings::ColoredHelp, AppSettings::ColorAuto])
 }
 
-pub(super) fn server_addr(m: &ArgMatches) -> String {
-    let host = m.value_of(MUST_ARG_HOST).unwrap();
-    let port = m.value_of(MUST_ARG_PORT).unwrap();
-    let addr = format!("{}:{}", host, port);
-
-    addr
-}
+// pub(super) fn server_addr(m: &ArgMatches) -> String {
+//     let host = m.value_of(MUST_ARG_HOST).unwrap();
+//     let port = m.value_of(MUST_ARG_PORT).unwrap();
+//     let addr = format!("{}:{}", host, port);
+//
+//     addr
+// }
 
 pub(super) async fn authenticate(m: &ArgMatches<'_>) -> crate::Result<crate::client::tcp::Client> {
-    crate::client::tcp::UnauthenticatedClient::from_addr(server_addr(m))
-        .await?
-        .authenticate(
-            m.value_of(MUST_ARG_USERNAME).unwrap(),
-            m.value_of(MUST_ARG_PASSWORD).unwrap(),
-        )
-        .await
+    crate::client::tcp::UnauthenticatedClient::from_addr(
+        m.value_of(MUST_ARG_HOST).unwrap(),
+        m.value_of(MUST_ARG_PORT)
+            .and_then(|port| port.parse::<u16>().ok())
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid port"))?,
+    )
+    .await?
+    .authenticate(
+        m.value_of(MUST_ARG_USERNAME).unwrap(),
+        m.value_of(MUST_ARG_PASSWORD).unwrap(),
+    )
+    .await
 }

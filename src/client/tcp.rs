@@ -1,28 +1,58 @@
-use tokio::net::{TcpStream, ToSocketAddrs};
+use std::io;
+use std::net::ToSocketAddrs;
+use std::sync::Arc;
 
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::TcpStream;
+use tokio_rustls::client::TlsStream;
+use tokio_rustls::rustls::ServerCertVerified;
+use tokio_rustls::{rustls, webpki, TlsConnector};
+
+use crate::common::info;
 use crate::protocol::connection::Connection;
 use crate::protocol::message::{Authenticate, Delete, Get, Message, Ping, Set};
 use crate::protocol::{Key, Value};
 use crate::{KvsError, Result};
 
-pub struct Client {
-    connection: Connection,
+pub struct Client<T = TlsStream<TcpStream>> {
+    connection: Connection<T>,
 }
 
-pub struct UnauthenticatedClient {
-    client: Client,
+pub struct UnauthenticatedClient<T> {
+    client: Client<T>,
 }
 
-impl UnauthenticatedClient {
-    pub fn new(stream: impl Into<TcpStream>) -> Self {
+impl UnauthenticatedClient<TlsStream<TcpStream>> {
+    pub fn new(stream: TlsStream<TcpStream>) -> Self {
         Self {
             client: Client::new(stream),
         }
     }
 
-    pub async fn from_addr(addr: impl ToSocketAddrs) -> Result<Self> {
+    pub async fn from_addr(host: impl Into<String>, port: u16) -> Result<Self> {
+        let host = host.into();
+        let addr = (host.as_str(), port)
+            .to_socket_addrs()?
+            .next()
+            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
+
+        let mut tls_config = rustls::ClientConfig::new();
+        tls_config
+            .dangerous()
+            .set_certificate_verifier(Arc::new(DangerousServerCertVerifier::new()));
+
+        let connector = TlsConnector::from(Arc::new(tls_config));
+
+        // TODO: remove hard code
+        let domain = webpki::DNSNameRef::try_from_ascii_str("localhost")
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid host"))?;
+
+        info!(%addr,?domain, "Connecting");
+
+        let stream = tokio::net::TcpStream::connect(addr).await?;
+
         Ok(UnauthenticatedClient::new(
-            tokio::net::TcpStream::connect(addr).await?,
+            connector.connect(domain, stream).await?,
         ))
     }
 
@@ -47,10 +77,13 @@ impl UnauthenticatedClient {
     }
 }
 
-impl Client {
-    fn new(stream: impl Into<TcpStream>) -> Self {
+impl<T> Client<T>
+where
+    T: AsyncWrite + AsyncRead + Unpin,
+{
+    fn new(stream: T) -> Self {
         Self {
-            connection: Connection::new(stream.into(), Some(1024 * 4)),
+            connection: Connection::new(stream, Some(1024 * 4)),
         }
     }
     // Return ping latency.
@@ -93,5 +126,25 @@ impl Client {
             Some(Message::Success(success)) => Ok(success.value()),
             _ => unreachable!(),
         }
+    }
+}
+
+struct DangerousServerCertVerifier {}
+
+impl DangerousServerCertVerifier {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl rustls::ServerCertVerifier for DangerousServerCertVerifier {
+    fn verify_server_cert(
+        &self,
+        _roots: &rustls::RootCertStore,
+        _presented_certs: &[rustls::Certificate],
+        _dns_name: webpki::DNSNameRef<'_>,
+        _oscp_response: &[u8],
+    ) -> Result<rustls::ServerCertVerified, rustls::TLSError> {
+        Ok(ServerCertVerified::assertion())
     }
 }
