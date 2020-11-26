@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["ymgyt <yamaguchi7073xtt@gmail.com>"]
 edition = "2018"
 license-file = "LICENSE"
+description = "Simple key value store"
+repository = "https://github.com/ymgyt/kvs"
+readme = "README.md"
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
