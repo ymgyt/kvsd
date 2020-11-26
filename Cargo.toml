@@ -1,11 +1,11 @@
 [package]
-name = "kvs"
+name = "kvsd"
 version = "0.1.0"
 authors = ["ymgyt <yamaguchi7073xtt@gmail.com>"]
 edition = "2018"
 license-file = "LICENSE"
 description = "Simple key value store"
-repository = "https://github.com/ymgyt/kvs"
+repository = "https://github.com/ymgyt/kvsd"
 readme = "README.md"
 
 

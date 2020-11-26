@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use tokio::net::TcpListener;
 
-use kvs;
-use kvs::client::Api;
+use kvsd::client::Api;
 
 mod common;
 
@@ -15,10 +14,10 @@ fn key_value_crud() {
 
     tokio_test::block_on(async move {
         let root_dir = common::temp_dir();
-        let mut config = kvs::config::Config::default();
+        let mut config = kvsd::config::Config::default();
 
         // Setup user credential.
-        config.kvs.users = vec![kvs::core::UserEntry {
+        config.kvs.users = vec![kvsd::core::UserEntry {
             username: "test".into(),
             password: "test".into(),
         }];
@@ -28,7 +27,7 @@ fn key_value_crud() {
         // let addr = "localhost:47379";
         let addr = ("localhost", 47379);
 
-        let mut initializer = kvs::config::Initializer::from_config(config);
+        let mut initializer = kvsd::config::Initializer::from_config(config);
 
         initializer.set_root_dir(root_dir.path());
         initializer.set_listener(TcpListener::bind(addr.clone()).await.unwrap());
@@ -43,7 +42,7 @@ fn key_value_crud() {
             tokio::spawn(async move { initializer.run_kvs(shutdown2.notified()).await });
 
         let mut client =
-            kvs::client::tcp::UnauthenticatedClient::insecure_from_addr(addr.0, addr.1)
+            kvsd::client::tcp::UnauthenticatedClient::insecure_from_addr(addr.0, addr.1)
                 .await
                 .unwrap()
                 .authenticate("test", "test")
@@ -54,8 +53,8 @@ fn key_value_crud() {
         let ping_duration = client.ping().await.unwrap();
         assert!(ping_duration.num_nanoseconds().unwrap() > 0);
 
-        let key = kvs::Key::new("key1").unwrap();
-        let value = kvs::Value::new(b"value1".as_ref()).unwrap();
+        let key = kvsd::Key::new("key1").unwrap();
+        let value = kvsd::Value::new(b"value1".as_ref()).unwrap();
 
         let got = client.get(key.clone()).await.unwrap();
         assert!(got.is_none());

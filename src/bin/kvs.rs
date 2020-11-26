@@ -1,3 +1,5 @@
+use kvsd::{self, cli, KvsError};
+
 fn main() {
     // Install global collector configured based on KVS_LOG env var.
     tracing_subscriber::fmt()
@@ -23,7 +25,7 @@ fn main() {
 async fn run() {
     if let Err(err) = run_inner().await {
         let code = match err {
-            kvs::KvsError::Unauthenticated => {
+            KvsError::Unauthenticated => {
                 eprintln!("unauthenticated");
                 2
             }
@@ -36,9 +38,7 @@ async fn run() {
     };
 }
 
-async fn run_inner() -> kvs::Result<()> {
-    use kvs::cli;
-
+async fn run_inner() -> kvsd::Result<()> {
     let m = cli::new().get_matches();
     match m.subcommand() {
         (cli::PING, Some(sm)) => cli::ping::run(sm).await,
