@@ -93,6 +93,7 @@ impl Config {
         self.set_authenticate_timeout_milliseconds(other.authenticate_timeout_milliseconds);
         self.set_listen_host(&mut other.listen_host);
         self.set_listen_port(&mut other.listen_port);
+        self.set_disable_tls(&mut other.disable_tls);
         self.set_tls_certificate(&mut other.tls_certificate);
         self.set_tls_key(&mut other.tls_key);
     }
@@ -231,7 +232,10 @@ impl Server {
         listener: TcpListener,
         request_sender: mpsc::Sender<UnitOfWork>,
     ) -> Result<()> {
-        info!("Server running. {:?}", self.config);
+        info!(
+            disable_tls = self.config.disable_tls(),
+            "Server running. {:?}", self.config
+        );
 
         let mut listener = SemaphoreListener::new(listener, self.config.max_tcp_connections());
         let connection_tcp_buffer_bytes = self.config.connection_tcp_buffer_bytes();
@@ -271,6 +275,7 @@ impl Server {
                             return;
                         }
                     };
+                    trace!("TLS Handshake success");
                     handler.run(connection).await;
                 });
             }

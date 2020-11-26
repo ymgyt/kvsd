@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
-use kvs;
 use tokio::net::TcpListener;
+
+use kvs;
+use kvs::client::Api;
 
 mod common;
 
@@ -40,12 +42,13 @@ fn key_value_crud() {
         let server_handler =
             tokio::spawn(async move { initializer.run_kvs(shutdown2.notified()).await });
 
-        let mut client = kvs::client::tcp::UnauthenticatedClient::from_addr(addr.0, addr.1)
-            .await
-            .unwrap()
-            .authenticate("test", "test")
-            .await
-            .unwrap();
+        let mut client =
+            kvs::client::tcp::UnauthenticatedClient::insecure_from_addr(addr.0, addr.1)
+                .await
+                .unwrap()
+                .authenticate("test", "test")
+                .await
+                .unwrap();
 
         // Ping
         let ping_duration = client.ping().await.unwrap();

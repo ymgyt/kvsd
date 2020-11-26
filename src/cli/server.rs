@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 
-use crate::cli::SERVER;
+use crate::cli::{MUST_ARG_DISABLE_TLS, SERVER};
 use crate::common::debug;
 use crate::config::Initializer;
 use crate::server::tcp::Config as ServerConfig;
@@ -136,6 +136,7 @@ fn read_server_config(m: &ArgMatches<'_>) -> ServerConfig {
     );
     config.set_listen_host(&mut m.value_of(ARG_HOST).map(String::from));
     config.set_listen_port(&mut m.value_of(ARG_PORT).map(String::from));
+    config.set_disable_tls(&mut Some(m.is_present(MUST_ARG_DISABLE_TLS)));
     config.set_tls_certificate(&mut m.value_of(MUST_ARG_TLS_CERT).map(String::from));
     config.set_tls_key(&mut m.value_of(MUST_ARG_TLS_KEY).map(String::from));
 

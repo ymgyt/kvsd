@@ -7,19 +7,19 @@ Simple Key Value store.
 terminal1
 ```
 # running server (default port: 7379)
-$ kvs server
+$ kvs server --disable-tls
 ```
 
 terminal2
 ```
 # running client
-$ kvs set key1 value1
+$ kvs set key1 value1 --disable-tls
 OK
 
-$ kvs get key1
+$ kvs get key1 --disable-tls
 value1
 
-$ kvs delete key1
+$ kvs delete key1 --disable-tls
 OK old value: value1
 ```
 

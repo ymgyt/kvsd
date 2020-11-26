@@ -7,6 +7,8 @@ pub mod set;
 use clap::{App, AppSettings, Arg, ArgMatches};
 
 use crate::cli;
+use crate::client::tcp::UnauthenticatedClient;
+use crate::client::Api;
 use crate::server::DEFAULT_PORT;
 
 pub const PING: &str = "ping";
@@ -19,6 +21,7 @@ pub(super) const MUST_ARG_HOST: &str = "host";
 pub(super) const MUST_ARG_PORT: &str = "port";
 pub(super) const MUST_ARG_USERNAME: &str = "username";
 pub(super) const MUST_ARG_PASSWORD: &str = "password";
+pub(super) const MUST_ARG_DISABLE_TLS: &str = "disable-tls";
 
 pub fn new() -> App<'static, 'static> {
     App::new(env!("CARGO_PKG_NAME"))
@@ -58,6 +61,14 @@ pub fn new() -> App<'static, 'static> {
                 .default_value("secret")
                 .global(true),
         )
+        .arg(
+            Arg::with_name(MUST_ARG_DISABLE_TLS)
+                .long("disable-tls")
+                .env("KVS_DISABLE_TLS")
+                .takes_value(false)
+                .help("disable tls connections")
+                .global(true),
+        )
         .subcommand(cli::ping::subcommand())
         .subcommand(cli::server::subcommand())
         .subcommand(cli::set::subcommand())
@@ -71,25 +82,32 @@ pub fn new() -> App<'static, 'static> {
         .global_settings(&[AppSettings::ColoredHelp, AppSettings::ColorAuto])
 }
 
-// pub(super) fn server_addr(m: &ArgMatches) -> String {
-//     let host = m.value_of(MUST_ARG_HOST).unwrap();
-//     let port = m.value_of(MUST_ARG_PORT).unwrap();
-//     let addr = format!("{}:{}", host, port);
-//
-//     addr
-// }
-
-pub(super) async fn authenticate(m: &ArgMatches<'_>) -> crate::Result<crate::client::tcp::Client> {
-    crate::client::tcp::UnauthenticatedClient::from_addr(
+pub(super) async fn authenticate(m: &ArgMatches<'_>) -> crate::Result<Box<dyn Api>> {
+    let (host, port) = (
         m.value_of(MUST_ARG_HOST).unwrap(),
         m.value_of(MUST_ARG_PORT)
             .and_then(|port| port.parse::<u16>().ok())
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid port"))?,
-    )
-    .await?
-    .authenticate(
+    );
+    let (user, pass) = (
         m.value_of(MUST_ARG_USERNAME).unwrap(),
         m.value_of(MUST_ARG_PASSWORD).unwrap(),
-    )
-    .await
+    );
+    let disable_tls = m.is_present(MUST_ARG_DISABLE_TLS);
+
+    let client: Box<dyn Api> = if disable_tls {
+        UnauthenticatedClient::insecure_from_addr(host, port)
+            .await?
+            .authenticate(user, pass)
+            .await
+            .map(Box::new)?
+    } else {
+        UnauthenticatedClient::from_addr(host, port)
+            .await?
+            .authenticate(user, pass)
+            .await
+            .map(Box::new)?
+    };
+
+    Ok(client)
 }
