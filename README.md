@@ -1,25 +1,25 @@
-# KVS
+# Kvsd
 
-Simple Key Value store.
+Simple Key Value store .
 
 ## Quick Start
 
 terminal1
 ```
 # running server (default port: 7379)
-$ kvs server --disable-tls
+$ kvsd server --disable-tls
 ```
 
 terminal2
 ```
 # running client
-$ kvs set key1 value1 --disable-tls
+$ kvsd set key1 value1 --disable-tls
 OK
 
-$ kvs get key1 --disable-tls
+$ kvsd get key1 --disable-tls
 value1
 
-$ kvs delete key1 --disable-tls
+$ kvsd delete key1 --disable-tls
 OK old value: value1
 ```
 
@@ -32,7 +32,7 @@ The order of configuration priority is as follows.(high to low)
 - configuration file
 - default value
 
-### kvs 
+### kvsd 
 
 ### server
 
@@ -43,15 +43,14 @@ The order of configuration priority is as follows.(high to low)
 
 ## Logging
 
-To specify logging directive, use `KVS_LOG` environment variable.
+To specify logging directive, use `KVSD_LOG` environment variable.
 
 ```console
-$ KVS_LOG=info kvs 
+$ KVSD_LOG=info kvs 
 ```
 
 ## TODO
 
-- [ ] Support TLS connection.
 - [ ] Remove `unreachable!() macro`
 - [ ] Use derive to reduce message/uow boiler plate code
 - [ ] Closing files during graceful shutdown

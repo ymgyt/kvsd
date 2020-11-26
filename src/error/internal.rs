@@ -7,7 +7,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError as OneshotRecvError;
 use tokio::time::error::Elapsed;
 
-use crate::common::KvsError;
+use crate::common::KvsdError;
 use crate::protocol::message::{FrameError, ParseError};
 
 #[derive(Debug)]
@@ -29,7 +29,7 @@ pub(crate) enum ErrorKind {
     // Unintentional disconnection.
     ConnectionResetByPeer,
     NetworkFraming(String),
-    Kvs(KvsError),
+    Kvsd(KvsdError),
     #[allow(dead_code)]
     Unauthorized(String), // not implemented yet :(
     Unauthenticated,
@@ -52,7 +52,7 @@ impl fmt::Display for Error {
             }
             ErrorKind::ConnectionResetByPeer => write!(f, "connection reset by peer"),
             ErrorKind::NetworkFraming(err) => write!(f, "network framing {}", err),
-            ErrorKind::Kvs(err) => err.fmt(f),
+            ErrorKind::Kvsd(err) => err.fmt(f),
             ErrorKind::Unauthorized(err) => write!(f, "unauthorized {}", err),
             ErrorKind::Unauthenticated => write!(f, "unauthenticated"),
             ErrorKind::TableNotFound(err) => write!(f, "table {} not found", err),
@@ -73,9 +73,9 @@ impl From<ErrorKind> for Error {
     }
 }
 
-impl From<KvsError> for Error {
-    fn from(err: KvsError) -> Self {
-        Error::from(ErrorKind::Kvs(err))
+impl From<KvsdError> for Error {
+    fn from(err: KvsdError) -> Self {
+        Error::from(ErrorKind::Kvsd(err))
     }
 }
 

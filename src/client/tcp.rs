@@ -14,7 +14,7 @@ use crate::common::info;
 use crate::protocol::connection::Connection;
 use crate::protocol::message::{Authenticate, Delete, Get, Message, Ping, Set};
 use crate::protocol::{Key, Value};
-use crate::{KvsError, Result};
+use crate::{KvsdError, Result};
 
 pub struct Client<T = TlsStream<TcpStream>> {
     connection: Connection<T>,
@@ -43,14 +43,14 @@ where
         self.client.connection.write_message(authenticate).await?;
         match self.client.connection.read_message().await? {
             Some(Message::Success(_)) => Ok(self.client),
-            Some(Message::Fail(_)) => Err(KvsError::Unauthenticated),
+            Some(Message::Fail(_)) => Err(KvsdError::Unauthenticated),
             // format!(..).into() does not work :(
-            msg => Err(KvsError::Internal(
-                Box::<dyn std::error::Error + Send + Sync>::from(format!(
-                    "unexpected message {:?}",
-                    msg
-                )),
-            )),
+            msg => Err(KvsdError::Internal(Box::<
+                dyn std::error::Error + Send + Sync,
+            >::from(format!(
+                "unexpected message {:?}",
+                msg
+            )))),
         }
     }
 }
@@ -130,12 +130,12 @@ where
         self.connection.write_message(set).await?;
         match self.connection.read_message().await? {
             Some(Message::Success(_)) => Ok(()),
-            msg => Err(KvsError::Internal(
-                Box::<dyn std::error::Error + Send + Sync>::from(format!(
-                    "unexpected message: {:?}",
-                    msg
-                )),
-            )),
+            msg => Err(KvsdError::Internal(Box::<
+                dyn std::error::Error + Send + Sync,
+            >::from(format!(
+                "unexpected message: {:?}",
+                msg
+            )))),
         }
     }
 

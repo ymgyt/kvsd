@@ -7,7 +7,7 @@ use crate::cli::{MUST_ARG_DISABLE_TLS, SERVER};
 use crate::common::debug;
 use crate::config::Initializer;
 use crate::server::tcp::Config as ServerConfig;
-use crate::{KvsError, Result};
+use crate::{KvsdError, Result};
 
 const ARG_MAX_CONN: &str = "server_max_connection";
 const ARG_CONNECTION_TCP_BUFFER_BYTES: &str = "server_connection_tcp_buffer_bytes";
@@ -15,32 +15,32 @@ const ARG_AUTHENTICATE_TIMEOUT_MILLISECONDS: &str = "server_authenticate_timeout
 const ARG_CONFIG_PATH: &str = "server_config_path";
 const ARG_HOST: &str = "server_host";
 const ARG_PORT: &str = "server_port";
-const MUST_ARG_KVS_DIR: &str = "kvs_dir";
+const MUST_ARG_KVSD_DIR: &str = "kvsd_dir";
 const MUST_ARG_TLS_CERT: &str = "tls_cert";
 const MUST_ARG_TLS_KEY: &str = "tls_key";
 
 pub(super) fn subcommand() -> App<'static, 'static> {
     SubCommand::with_name(SERVER)
-        .about("Running kvs server")
+        .about("Running kvsd server")
         .arg(
             Arg::with_name(ARG_MAX_CONN)
                 .long("max-connections")
                 .takes_value(true)
-                .env("KVS_SERVER_MAX_CONNECTIONS")
+                .env("KVSD_SERVER_MAX_CONNECTIONS")
                 .help("Max tcp connections"),
         )
         .arg(
             Arg::with_name(ARG_CONNECTION_TCP_BUFFER_BYTES)
                 .long("connection-tcp-buffer-bytes")
                 .takes_value(true)
-                .env("KVS_SERVER_CONNECTION_TCP_BUFFER_BYTES")
+                .env("KVSD_SERVER_CONNECTION_TCP_BUFFER_BYTES")
                 .help("Buffer bytes assigned to each tcp connection"),
         )
         .arg(
             Arg::with_name(ARG_AUTHENTICATE_TIMEOUT_MILLISECONDS)
                 .long("authenticate-timeout-milliseconds")
                 .takes_value(true)
-                .env("KVS_SERVER_AUTHENTICATE_TIMEOUT_MILLISECONDS")
+                .env("KVSD_SERVER_AUTHENTICATE_TIMEOUT_MILLISECONDS")
                 .help("Authenticate timeout."),
         )
         .arg(
@@ -49,37 +49,37 @@ pub(super) fn subcommand() -> App<'static, 'static> {
                 .short("C")
                 .default_value("./files/config.yaml")
                 .takes_value(true)
-                .env("KVS_SERVER_CONFIG_PATH")
+                .env("KVSD_SERVER_CONFIG_PATH")
                 .help("Configuration file path"),
         )
         .arg(
             Arg::with_name(ARG_HOST)
                 .long("bind-host")
                 .takes_value(true)
-                .env("KVS_SERVER_HOST")
+                .env("KVSD_SERVER_HOST")
                 .help("Tcp binding address host(ex 0.0.0.0, localhost)"),
         )
         .arg(
             Arg::with_name(ARG_PORT)
                 .long("bind-port")
                 .takes_value(true)
-                .env("KVS_SERVER_PORT")
+                .env("KVSD_SERVER_PORT")
                 .help("Tcp binding address port"),
         )
         .arg(
-            Arg::with_name(MUST_ARG_KVS_DIR)
-                .long("kvs-dir")
+            Arg::with_name(MUST_ARG_KVSD_DIR)
+                .long("kvsd-dir")
                 .takes_value(true)
-                .default_value(".kvs")
-                .env("KVS_DIR")
-                .help("root directory where kvs store it's data"),
+                .default_value(".kvsd")
+                .env("KVSD_DIR")
+                .help("root directory where kvsd store it's data"),
         )
         .arg(
             Arg::with_name(MUST_ARG_TLS_CERT)
                 .long("cert")
                 .takes_value(true)
                 .default_value("./files/localhost.pem")
-                .env("KVS_TLS_CERT")
+                .env("KVSD_TLS_CERT")
                 .help("tls server certificate file path"),
         )
         .arg(
@@ -87,7 +87,7 @@ pub(super) fn subcommand() -> App<'static, 'static> {
                 .long("key")
                 .takes_value(true)
                 .default_value("./files/localhost.key")
-                .env("KVS_TLS_KEY")
+                .env("KVSD_TLS_KEY")
                 .help("tls server private key file path"),
         )
 }
@@ -99,7 +99,7 @@ pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
         .unwrap();
 
     // Canonicalize require path already exist.
-    let root_dir = m.value_of(MUST_ARG_KVS_DIR).map(Path::new).unwrap();
+    let root_dir = m.value_of(MUST_ARG_KVSD_DIR).map(Path::new).unwrap();
     tokio::fs::create_dir_all(root_dir).await?;
     let root_dir = root_dir.canonicalize().unwrap();
 
@@ -117,9 +117,9 @@ pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
     initializer.init_dir().await?;
 
     initializer
-        .run_kvs(tokio::signal::ctrl_c())
+        .run_kvsd(tokio::signal::ctrl_c())
         .await
-        .map_err(KvsError::from)
+        .map_err(KvsdError::from)
 }
 
 fn read_server_config(m: &ArgMatches<'_>) -> ServerConfig {

@@ -30,9 +30,9 @@ pub fn new() -> App<'static, 'static> {
         .arg(
             Arg::with_name(MUST_ARG_HOST)
                 .long("host")
-                .env("KVS_HOST")
+                .env("KVSD_HOST")
                 .default_value("127.0.0.1")
-                .help("Remote kvs server host")
+                .help("Remote kvsd server host")
                 .global(true),
         )
         .arg(
@@ -46,16 +46,16 @@ pub fn new() -> App<'static, 'static> {
         .arg(
             Arg::with_name(MUST_ARG_USERNAME)
                 .long("username")
-                .env("KVS_USERNAME")
+                .env("KVSD_USERNAME")
                 .takes_value(true)
                 .help("Username")
-                .default_value("kvsuser")
+                .default_value("kvsduser")
                 .global(true),
         )
         .arg(
             Arg::with_name(MUST_ARG_PASSWORD)
                 .long("password")
-                .env("KVS_PASSWORD")
+                .env("KVSD_PASSWORD")
                 .takes_value(true)
                 .help("Password")
                 .default_value("secret")
@@ -64,7 +64,7 @@ pub fn new() -> App<'static, 'static> {
         .arg(
             Arg::with_name(MUST_ARG_DISABLE_TLS)
                 .long("disable-tls")
-                .env("KVS_DISABLE_TLS")
+                .env("KVSD_DISABLE_TLS")
                 .takes_value(false)
                 .help("disable tls connections")
                 .global(true),

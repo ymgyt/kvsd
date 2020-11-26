@@ -6,7 +6,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::ops::Deref;
 
-use crate::common::{KvsError, Result};
+use crate::common::{KvsdError, Result};
 
 // Maximum number of bytes in Key.
 // if it's not in ascii, Len  is misleading, so using Bytes explicitly.
@@ -15,7 +15,7 @@ pub const MAX_KYE_BYTES: usize = 1024;
 // Maximum number of bytes in Value.
 pub const MAX_VALUE_BYTES: usize = 1024 * 1024 * 10;
 
-// Key represents a string that meets the specifications of the kvs protocol.
+// Key represents a string that meets the specifications of the kvsd protocol.
 // other components can handle Key without checking the length.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Key(String);
@@ -34,7 +34,7 @@ impl fmt::Display for Key {
 }
 
 impl TryFrom<String> for Key {
-    type Error = KvsError;
+    type Error = KvsdError;
     fn try_from(s: String) -> Result<Self, Self::Error> {
         Key::new(s)
     }
@@ -42,10 +42,10 @@ impl TryFrom<String> for Key {
 
 impl Key {
     // Construct Key from given string.
-    pub fn new(s: impl Into<String>) -> Result<Self, KvsError> {
+    pub fn new(s: impl Into<String>) -> Result<Self, KvsdError> {
         let s = s.into();
         if s.len() > MAX_KYE_BYTES {
-            Err(KvsError::MaxKeyBytes {
+            Err(KvsdError::MaxKeyBytes {
                 key: s,
                 max_bytes: MAX_KYE_BYTES,
             })
@@ -72,10 +72,10 @@ impl Deref for Value {
 }
 
 impl Value {
-    pub fn new(v: impl Into<Box<[u8]>>) -> Result<Self, KvsError> {
+    pub fn new(v: impl Into<Box<[u8]>>) -> Result<Self, KvsdError> {
         let v = v.into();
         if v.len() > MAX_VALUE_BYTES {
-            Err(KvsError::MaxValueBytes {
+            Err(KvsdError::MaxValueBytes {
                 max_bytes: MAX_VALUE_BYTES,
             })
         } else {
@@ -112,7 +112,7 @@ where
     K: Into<String>,
     V: AsRef<[u8]>,
 {
-    type Error = KvsError;
+    type Error = KvsdError;
     fn try_from(kv: (K, V)) -> Result<Self, Self::Error> {
         Ok(KeyValue {
             key: Key::new(kv.0)?,

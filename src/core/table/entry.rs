@@ -247,13 +247,13 @@ impl Body {
 mod tests {
     use super::*;
     use crate::core::table::index::Index;
-    use crate::KvsError;
+    use crate::KvsdError;
     use std::convert::TryInto;
     use std::io::Cursor;
 
     fn try_from_key_value<T>(kv: T) -> Result<Entry>
     where
-        T: TryInto<KeyValue, Error = KvsError>,
+        T: TryInto<KeyValue, Error = KvsdError>,
     {
         let kv = kv.try_into()?;
         Entry::try_from(kv)

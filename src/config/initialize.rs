@@ -8,7 +8,7 @@ use crate::common::{info, Result};
 use crate::config::{filepath, Config};
 use crate::core;
 use crate::server::tcp::Server;
-use crate::KvsError;
+use crate::KvsdError;
 
 #[derive(Debug)]
 pub struct Initializer {
@@ -26,7 +26,7 @@ impl Initializer {
     }
 
     pub fn set_root_dir(&mut self, root_dir: impl Into<PathBuf>) {
-        self.config.kvs.root_dir = Some(root_dir.into());
+        self.config.kvsd.root_dir = Some(root_dir.into());
     }
 
     pub fn set_listener(&mut self, listener: TcpListener) {
@@ -40,12 +40,12 @@ impl Initializer {
         Ok(Initializer::from_config(config))
     }
 
-    pub async fn run_kvs(self, shutdown: impl Future) -> Result<(), KvsError> {
-        let builder = core::Builder::from_config(self.config.kvs);
-        let kvs = builder.build().await?;
-        let request_sender = kvs.request_channel();
+    pub async fn run_kvsd(self, shutdown: impl Future) -> Result<(), KvsdError> {
+        let builder = core::Builder::from_config(self.config.kvsd);
+        let kvsd = builder.build().await?;
+        let request_sender = kvsd.request_channel();
 
-        tokio::spawn(kvs.run());
+        tokio::spawn(kvsd.run());
 
         let listener = match self.listener {
             Some(listener) => listener,
@@ -63,12 +63,12 @@ impl Initializer {
         Ok(())
     }
 
-    pub async fn init_dir(&mut self) -> Result<(), KvsError> {
-        let root_dir = self.config.kvs.root_dir.clone().unwrap();
+    pub async fn init_dir(&mut self) -> Result<(), KvsdError> {
+        let root_dir = self.config.kvsd.root_dir.clone().unwrap();
 
-        info!(path=%root_dir.display(), "Initialize kvs root directory");
+        info!(path=%root_dir.display(), "Initialize kvsd root directory");
 
-        // Create root kvs directory.
+        // Create root kvsd directory.
         tokio::fs::create_dir_all(root_dir.as_path()).await?;
 
         // Namespaces.

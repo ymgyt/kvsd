@@ -1,5 +1,5 @@
-mod kvs;
-pub(crate) use self::kvs::Builder;
+mod kvsd;
+pub(crate) use self::kvsd::Builder;
 
 mod config;
 pub use self::config::{Config, UserEntry};

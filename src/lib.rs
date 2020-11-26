@@ -9,8 +9,8 @@ pub mod core;
 pub mod error;
 pub mod protocol;
 
-pub use crate::error::KvsError;
-pub type Result<T, E = crate::error::KvsError> = std::result::Result<T, E>;
+pub use crate::error::KvsdError;
+pub type Result<T, E = crate::error::KvsdError> = std::result::Result<T, E>;
 
 pub use protocol::{Key, Value};
 
@@ -20,7 +20,7 @@ pub(crate) mod common {
     pub(crate) type Error = crate::error::internal::Error;
     pub(crate) type ErrorKind = crate::error::internal::ErrorKind;
 
-    pub use crate::error::KvsError;
+    pub use crate::error::KvsdError;
 
     pub(crate) type Time = chrono::DateTime<chrono::Utc>;
 

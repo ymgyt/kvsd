@@ -5,7 +5,7 @@ server:
   listen_host: 127.0.0.1
   listen_port: 7379
 
-kvs:
+kvsd:
   users:
-    - username: "kvsuser"
+    - username: "kvsduser"
       password: "secret"

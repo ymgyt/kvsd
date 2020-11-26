@@ -6,14 +6,16 @@ use crate::Result;
 const MUST_ARG_PING_COUNT: &str = "count";
 
 pub(super) fn subcommand() -> App<'static, 'static> {
-    SubCommand::with_name(PING).about("Ping to kvs server").arg(
-        Arg::with_name(MUST_ARG_PING_COUNT)
-            .takes_value(true)
-            .long("count")
-            .short("c")
-            .default_value("1")
-            .help("Ping counts"),
-    )
+    SubCommand::with_name(PING)
+        .about("Ping to kvsd server")
+        .arg(
+            Arg::with_name(MUST_ARG_PING_COUNT)
+                .takes_value(true)
+                .long("count")
+                .short("c")
+                .default_value("1")
+                .help("Ping counts"),
+        )
 }
 
 pub async fn run(m: &ArgMatches<'_>) -> Result<()> {

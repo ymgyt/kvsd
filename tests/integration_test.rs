@@ -17,7 +17,7 @@ fn key_value_crud() {
         let mut config = kvsd::config::Config::default();
 
         // Setup user credential.
-        config.kvs.users = vec![kvsd::core::UserEntry {
+        config.kvsd.users = vec![kvsd::core::UserEntry {
             username: "test".into(),
             password: "test".into(),
         }];
@@ -39,7 +39,7 @@ fn key_value_crud() {
         let shutdown2 = shutdown.clone();
 
         let server_handler =
-            tokio::spawn(async move { initializer.run_kvs(shutdown2.notified()).await });
+            tokio::spawn(async move { initializer.run_kvsd(shutdown2.notified()).await });
 
         let mut client =
             kvsd::client::tcp::UnauthenticatedClient::insecure_from_addr(addr.0, addr.1)

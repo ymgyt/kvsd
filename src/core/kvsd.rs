@@ -19,14 +19,14 @@ impl Builder {
         builder
     }
 
-    pub(crate) async fn build(mut self) -> Result<Kvs> {
+    pub(crate) async fn build(mut self) -> Result<Kvsd> {
         let (send, recv) = mpsc::channel(self.request_channel_buffer);
 
         let dispatcher = self.build_dispatcher().await?;
 
         let mw = MiddlewareChain::new(&self.config.unwrap_or_default(), dispatcher);
 
-        Ok(Kvs {
+        Ok(Kvsd {
             request_send: send,
             request_recv: recv,
             middlewares: mw,
@@ -41,7 +41,7 @@ impl Builder {
         let default_table = root_dir
             .join(filepath::NAMESPACES)
             .join(filepath::NS_DEFAULT)
-            .join("default/default.kvs");
+            .join("default/default.kvsd");
         debug!("Open default table file {}", default_table.display());
         let default_table = Table::from_path(rx, default_table).await?;
 
@@ -61,19 +61,19 @@ impl Builder {
     }
 }
 
-pub(crate) struct Kvs {
+pub(crate) struct Kvsd {
     request_recv: Receiver<UnitOfWork>,
     request_send: Sender<UnitOfWork>,
     middlewares: MiddlewareChain,
 }
 
-impl Kvs {
+impl Kvsd {
     pub fn request_channel(&self) -> Sender<UnitOfWork> {
         self.request_send.clone()
     }
 
     pub(crate) async fn run(mut self) {
-        info!("Kvs running");
+        info!("Kvsd running");
 
         while let Some(request) = self.request_recv.recv().await {
             // TODO: middleware, dispatcher
