@@ -32,6 +32,8 @@ pub struct Config {
     listen_host: Option<String>,
     // tcp listen port.
     listen_port: Option<String>,
+    // disable tls connections.
+    disable_tls: Option<bool>,
     // tls server certificate file path
     tls_certificate: Option<String>,
     // tls server private key file path
@@ -45,37 +47,42 @@ impl Config {
     const DEFAULT_LISTEN_HOST: &'static str = "127.0.0.1";
     const DEFAULT_LISTEN_PORT: &'static str = crate::server::DEFAULT_PORT;
 
-    pub(crate) fn set_max_tcp_connections(&mut self, val: Option<u32>) {
+    pub fn set_max_tcp_connections(&mut self, val: Option<u32>) {
         if let Some(val) = val {
             self.max_tcp_connections = Some(std::cmp::max(val, 1));
         }
     }
-    pub(crate) fn set_connection_tcp_buffer_bytes(&mut self, val: Option<usize>) {
+    pub fn set_connection_tcp_buffer_bytes(&mut self, val: Option<usize>) {
         if let Some(val) = val {
             self.connection_tcp_buffer_bytes = Some(std::cmp::max(val, 1));
         }
     }
-    pub(crate) fn set_authenticate_timeout_milliseconds(&mut self, val: Option<u64>) {
+    pub fn set_authenticate_timeout_milliseconds(&mut self, val: Option<u64>) {
         if let Some(val) = val {
             self.authenticate_timeout_milliseconds = Some(std::cmp::max(val, 10));
         }
     }
-    pub(crate) fn set_listen_host(&mut self, val: &mut Option<String>) {
+    pub fn set_listen_host(&mut self, val: &mut Option<String>) {
         if let Some(val) = val.take() {
             self.listen_host = Some(val)
         }
     }
-    pub(crate) fn set_listen_port(&mut self, val: &mut Option<String>) {
+    pub fn set_listen_port(&mut self, val: &mut Option<String>) {
         if let Some(val) = val.take() {
             self.listen_port = Some(val)
         }
     }
-    pub(crate) fn set_tls_certificate(&mut self, val: &mut Option<String>) {
+    pub fn set_disable_tls(&mut self, val: &mut Option<bool>) {
+        if let Some(val) = val.take() {
+            self.disable_tls = Some(val)
+        }
+    }
+    pub fn set_tls_certificate(&mut self, val: &mut Option<String>) {
         if let Some(val) = val.take() {
             self.tls_certificate = Some(val)
         }
     }
-    pub(crate) fn set_tls_key(&mut self, val: &mut Option<String>) {
+    pub fn set_tls_key(&mut self, val: &mut Option<String>) {
         if let Some(val) = val.take() {
             self.tls_key = Some(val)
         }
@@ -121,6 +128,10 @@ impl Config {
                 .as_deref()
                 .unwrap_or(Config::DEFAULT_LISTEN_PORT),
         )
+    }
+
+    fn disable_tls(&self) -> bool {
+        self.disable_tls.unwrap_or(false)
     }
 
     // TODO: handle err
@@ -222,55 +233,74 @@ impl Server {
     ) -> Result<()> {
         info!("Server running. {:?}", self.config);
 
-        // Setup TLS
-        // TODO: def tls setup method
-        let mut tls_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
-
-        let certs = self.config.load_certs();
-        let mut keys = self.config.load_keys();
-        tls_config.set_single_cert(certs, keys.remove(0)).unwrap();
-
-        let tls_acceptor = TlsAcceptor::from(Arc::new(tls_config));
-
         let mut listener = SemaphoreListener::new(listener, self.config.max_tcp_connections());
+        let connection_tcp_buffer_bytes = self.config.connection_tcp_buffer_bytes();
 
-        loop {
-            let (socket, peer_addr) = listener.accept().await?;
-            info!(
-                available = listener.max_connections.available_permits(),
-                "Connection accepted"
-            );
+        if self.config.disable_tls() {
+            loop {
+                let (socket, handler) = self.accept(&mut listener, request_sender.clone()).await?;
+                let connection = Connection::new(socket, Some(connection_tcp_buffer_bytes));
 
-            let acceptor = tls_acceptor.clone();
-            let conn_tcp_buffer_bytes = self.config.connection_tcp_buffer_bytes();
+                tokio::spawn(handler.run(connection));
+            }
+        } else {
+            // Setup TLS
+            let mut tls_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
 
-            let mut handler = Handler {
-                principal: Arc::new(Principal::AnonymousUser),
-                remote_addr: Some(peer_addr),
-                request_sender: request_sender.clone(),
-                shutdown: ShutdownSubscriber::new(
-                    self.graceful_shutdown.notify_shutdown.subscribe(),
-                    self.graceful_shutdown.shutdown_complete_tx.clone(),
-                ),
-                max_connections: listener.max_connections.clone(),
-                authenticate_timeout: self.config.authenticate_timeout(),
-            };
+            let certs = self.config.load_certs();
+            let mut keys = self.config.load_keys();
+            tls_config.set_single_cert(certs, keys.remove(0)).unwrap();
 
-            tokio::spawn(async move {
-                let connection =
-                    match Server::handshake(acceptor, socket, conn_tcp_buffer_bytes).await {
+            let tls_acceptor = TlsAcceptor::from(Arc::new(tls_config));
+
+            loop {
+                let (socket, handler) = self.accept(&mut listener, request_sender.clone()).await?;
+                let acceptor = tls_acceptor.clone();
+
+                tokio::spawn(async move {
+                    let connection = match Server::handshake(
+                        acceptor,
+                        socket,
+                        connection_tcp_buffer_bytes,
+                    )
+                    .await
+                    {
                         Ok(connection) => connection,
                         Err(err) => {
                             error!("TLS: {}", err);
                             return;
                         }
                     };
-
-                if let Err(err) = handler.handle(connection).await {
-                    error!("{}", err);
-                }
-            });
+                    handler.run(connection).await;
+                });
+            }
         }
+    }
+
+    async fn accept(
+        &mut self,
+        listener: &mut SemaphoreListener,
+        request_sender: mpsc::Sender<UnitOfWork>,
+    ) -> Result<(TcpStream, Handler)> {
+        let (socket, peer_addr) = listener.accept().await?;
+        info!(
+            available = listener.max_connections.available_permits(),
+            "Connection accepted"
+        );
+
+        let handler = Handler {
+            principal: Arc::new(Principal::AnonymousUser),
+            remote_addr: Some(peer_addr),
+            request_sender,
+            shutdown: ShutdownSubscriber::new(
+                self.graceful_shutdown.notify_shutdown.subscribe(),
+                self.graceful_shutdown.shutdown_complete_tx.clone(),
+            ),
+            max_connections: listener.max_connections.clone(),
+            authenticate_timeout: self.config.authenticate_timeout(),
+        };
+
+        Ok((socket, handler))
     }
 
     async fn handshake(
@@ -293,6 +323,15 @@ struct Handler {
 }
 
 impl Handler {
+    async fn run<T>(mut self, conn: Connection<T>)
+    where
+        T: AsyncWrite + AsyncRead + Unpin,
+    {
+        if let Err(err) = self.handle(conn).await {
+            error!("{}", err);
+        }
+    }
+
     async fn handle<T>(&mut self, mut conn: Connection<T>) -> Result<()>
     where
         T: AsyncWrite + AsyncRead + Unpin,

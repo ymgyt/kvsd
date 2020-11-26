@@ -20,9 +20,11 @@ fn key_value_crud() {
             username: "test".into(),
             password: "test".into(),
         }];
+        config.server.set_disable_tls(&mut Some(true));
 
         // Test Server listen addr
-        let addr = "localhost:47379";
+        // let addr = "localhost:47379";
+        let addr = ("localhost", 47379);
 
         let mut initializer = kvs::config::Initializer::from_config(config);
 
@@ -38,7 +40,7 @@ fn key_value_crud() {
         let server_handler =
             tokio::spawn(async move { initializer.run_kvs(shutdown2.notified()).await });
 
-        let mut client = kvs::client::tcp::UnauthenticatedClient::from_addr(addr)
+        let mut client = kvs::client::tcp::UnauthenticatedClient::from_addr(addr.0, addr.1)
             .await
             .unwrap()
             .authenticate("test", "test")
