@@ -1,3 +1,5 @@
+//! protocol module specifies communication between the server and client.
+
 pub(crate) mod connection;
 
 pub(crate) mod message;
@@ -8,15 +10,15 @@ use std::ops::Deref;
 
 use crate::common::{KvsdError, Result};
 
-// Maximum number of bytes in Key.
-// if it's not in ascii, Len  is misleading, so using Bytes explicitly.
+/// Maximum number of bytes in Key.
+/// if it's not in ascii, Len  is misleading, so using Bytes explicitly.
 pub const MAX_KYE_BYTES: usize = 1024;
 
-// Maximum number of bytes in Value.
+/// Maximum number of bytes in Value.
 pub const MAX_VALUE_BYTES: usize = 1024 * 1024 * 10;
 
-// Key represents a string that meets the specifications of the kvsd protocol.
-// other components can handle Key without checking the length.
+/// Key represents a string that meets the specifications of the kvsd protocol.
+/// other components can handle Key without checking the length.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Key(String);
 
@@ -41,7 +43,7 @@ impl TryFrom<String> for Key {
 }
 
 impl Key {
-    // Construct Key from given string.
+    /// Construct Key from given string.
     pub fn new(s: impl Into<String>) -> Result<Self, KvsdError> {
         let s = s.into();
         if s.len() > MAX_KYE_BYTES {
@@ -54,13 +56,14 @@ impl Key {
         }
     }
 
+    /// Convert into String.
     pub fn into_string(self) -> String {
         self.0
     }
 }
 
-// Value represents binary data given by user.
-// It does not have to be Vec<u8> because we do not mutate.
+/// Value represents binary data given by user.
+/// It does not have to be Vec<u8> because we do not mutate.
 #[derive(Clone, PartialEq)]
 pub struct Value(Box<[u8]>);
 
@@ -72,6 +75,8 @@ impl Deref for Value {
 }
 
 impl Value {
+    /// Construct Value.
+    /// if given value exceed the maximum bytes, return error.
     pub fn new(v: impl Into<Box<[u8]>>) -> Result<Self, KvsdError> {
         let v = v.into();
         if v.len() > MAX_VALUE_BYTES {
@@ -87,6 +92,7 @@ impl Value {
         Value(v.into())
     }
 
+    /// Convert into Box<[u8]>
     pub fn into_boxed_bytes(self) -> Box<[u8]> {
         self.0
     }
@@ -102,9 +108,9 @@ impl fmt::Debug for Value {
     }
 }
 
-pub struct KeyValue {
-    pub key: Key,
-    pub value: Value,
+pub(crate) struct KeyValue {
+    pub(crate) key: Key,
+    pub(crate) value: Value,
 }
 
 impl<K, V> TryFrom<(K, V)> for KeyValue

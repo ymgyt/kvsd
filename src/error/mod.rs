@@ -1,15 +1,30 @@
+//! Define the errors that occur in the processing of kvsd.
+
 pub(crate) mod internal;
 
 use std::fmt;
 use std::io;
 
+/// Kvsd user facing error.
 #[derive(Debug)]
 pub enum KvsdError {
-    // The Key exceeds the maximum number of bytes specified in the protocol.
-    MaxKeyBytes { key: String, max_bytes: usize },
-    MaxValueBytes { max_bytes: usize },
+    /// The Key exceeds the maximum number of bytes specified in the protocol.
+    MaxKeyBytes {
+        /// Given key.
+        key: String,
+        /// Maximum bytes.
+        max_bytes: usize,
+    },
+    /// The value exceeds the maximum number of bytes specified in the protocol.
+    MaxValueBytes {
+        /// Maximum bytes.
+        max_bytes: usize,
+    },
+    /// I/O related error.
     Io(io::Error),
+    /// Unauthenticated user request operations that require authentication.
     Unauthenticated,
+    /// Etc error, maybe bug.
     Internal(Box<dyn std::error::Error + Send + Sync>),
 }
 

@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 
-use crate::cli::{MUST_ARG_DISABLE_TLS, SERVER};
+use crate::cli::{root::MUST_ARG_DISABLE_TLS, SERVER};
 use crate::common::debug;
 use crate::config::Initializer;
 use crate::server::tcp::Config as ServerConfig;
@@ -92,6 +92,7 @@ pub(super) fn subcommand() -> App<'static, 'static> {
         )
 }
 
+/// Launch the server command.
 pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
     let config_path = m
         .value_of(ARG_CONFIG_PATH)

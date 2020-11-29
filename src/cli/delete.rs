@@ -16,6 +16,7 @@ pub(super) fn subcommand() -> App<'static, 'static> {
     )
 }
 
+/// launch the delete command.
 pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
     let key = m.value_of(MUST_ARG_KEY).unwrap();
 

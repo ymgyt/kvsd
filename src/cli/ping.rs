@@ -18,6 +18,7 @@ pub(super) fn subcommand() -> App<'static, 'static> {
         )
 }
 
+/// Launch the ping command.
 pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
     let count = m
         .value_of(MUST_ARG_PING_COUNT)

@@ -1,6 +1,7 @@
 # Kvsd
 
-Simple Key Value store .
+Kvsd is an asynchronous key value store with tokio runtime.
+The key value is saved by appending it to a file and keeps the offset in memory.
 
 ## Quick Start
 
@@ -46,7 +47,7 @@ The order of configuration priority is as follows.(high to low)
 To specify logging directive, use `KVSD_LOG` environment variable.
 
 ```console
-$ KVSD_LOG=info kvs 
+$ KVSD_LOG=info kvsd
 ```
 
 ## TODO

@@ -1,3 +1,5 @@
+//! Config module manage controllable values
+
 mod initialize;
 pub use self::initialize::Initializer;
 

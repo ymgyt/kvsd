@@ -26,6 +26,7 @@ pub(super) fn subcommand() -> App<'static, 'static> {
         )
 }
 
+/// Launch the set command.
 pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
     let key = m.value_of(MUST_ARG_KEY).unwrap();
     let value = m.value_of(MUST_ARG_VALUE).unwrap();

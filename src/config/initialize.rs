@@ -10,6 +10,11 @@ use crate::core;
 use crate::server::tcp::Server;
 use crate::KvsdError;
 
+/// Initializer initialize kvsd.
+/// mainly to do the following.
+///   * create directory structure
+///   * build core kvsd from config
+///   * listen tcp if needed, then run tcp server
 #[derive(Debug)]
 pub struct Initializer {
     pub(crate) config: Config,
@@ -17,7 +22,7 @@ pub struct Initializer {
 }
 
 impl Initializer {
-    // Construct Initializer from config.
+    /// Construct Initializer from config.
     pub fn from_config(config: Config) -> Self {
         Self {
             config,
@@ -25,10 +30,13 @@ impl Initializer {
         }
     }
 
+    /// Set kvsd root directory.
     pub fn set_root_dir(&mut self, root_dir: impl Into<PathBuf>) {
         self.config.kvsd.root_dir = Some(root_dir.into());
     }
 
+    /// Set tcp listener.
+    /// the initializer call the bind system call if the tcp listener is not set at startup.
     pub fn set_listener(&mut self, listener: TcpListener) {
         self.listener = Some(listener);
     }
@@ -40,6 +48,8 @@ impl Initializer {
         Ok(Initializer::from_config(config))
     }
 
+    /// Running initialize process.
+    /// start the graceful shutdown process when shutdown future returns Poll::Ready.
     pub async fn run_kvsd(self, shutdown: impl Future) -> Result<(), KvsdError> {
         let builder = core::Builder::from_config(self.config.kvsd);
         let kvsd = builder.build().await?;
@@ -63,6 +73,7 @@ impl Initializer {
         Ok(())
     }
 
+    /// Initialize kvsd directory structure.
     pub async fn init_dir(&mut self) -> Result<(), KvsdError> {
         let root_dir = self.config.kvsd.root_dir.clone().unwrap();
 

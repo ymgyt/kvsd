@@ -16,10 +16,13 @@ use crate::protocol::message::{Authenticate, Delete, Get, Message, Ping, Set};
 use crate::protocol::{Key, Value};
 use crate::{KvsdError, Result};
 
-pub struct Client<T = TlsStream<TcpStream>> {
+/// Implementation of client api by tcp.
+pub struct Client<T> {
     connection: Connection<T>,
 }
 
+/// A client that is not authenticated by the server.
+/// it provide processing allowed to clients that are not authenticate.
 pub struct UnauthenticatedClient<T> {
     client: Client<T>,
 }
@@ -28,12 +31,14 @@ impl<T> UnauthenticatedClient<T>
 where
     T: AsyncWrite + AsyncRead + Unpin,
 {
+    /// Construct Client by given stream.
     pub fn new(stream: T) -> Self {
         Self {
             client: Client::new(stream),
         }
     }
 
+    /// Try authenticate by given credential.
     pub async fn authenticate<S1, S2>(mut self, username: S1, password: S2) -> Result<Client<T>>
     where
         S1: Into<String>,
@@ -56,6 +61,7 @@ where
 }
 
 impl UnauthenticatedClient<TcpStream> {
+    /// Return client that is not protected by TLS for tcp communication.
     pub async fn insecure_from_addr(host: impl AsRef<str>, port: u16) -> Result<Self> {
         let addr = (host.as_ref(), port)
             .to_socket_addrs()?
@@ -71,6 +77,7 @@ impl UnauthenticatedClient<TcpStream> {
 }
 
 impl UnauthenticatedClient<TlsStream<TcpStream>> {
+    /// Return the client with a TLS connection to the given address.
     pub async fn from_addr(host: impl Into<String>, port: u16) -> Result<Self> {
         let host = host.into();
         let addr = (host.as_str(), port)
