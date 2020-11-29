@@ -36,4 +36,8 @@ tokio-rustls = { version = "0.20.0", features = ["dangerous_configuration"] }
 [dev-dependencies]
 tokio-test = "0.3.0"
 tempdir = "0.3.7"
+criterion = "0.3"
 
+[[bench]]
+name = "kvsd_benchmark"
+harness = false

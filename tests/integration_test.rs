@@ -24,7 +24,6 @@ fn key_value_crud() {
         config.server.set_disable_tls(&mut Some(true));
 
         // Test Server listen addr
-        // let addr = "localhost:47379";
         let addr = ("localhost", 47379);
 
         let mut initializer = kvsd::config::Initializer::from_config(config);
