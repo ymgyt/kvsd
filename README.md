@@ -3,6 +3,8 @@
 Kvsd is an asynchronous key value store with tokio runtime.
 The key value is saved by appending it to a file and keeps the offset in memory.
 
+[blog post](https://blog.ymgyt.io/entry/key_value_store_with_tokio)
+
 ## Quick Start
 
 terminal1
@@ -37,10 +39,11 @@ The order of configuration priority is as follows.(high to low)
 
 ### server
 
-| Key | Default | 
-| --- | ------- |
-| max_tcp_connections | xxx | 
-| connection_tcp_buffer_bytes | xxx |
+| Key | Description | Default | 
+| --- | ----------- | ------- |
+| max_tcp_connections | Number of clients that can be connected simultaneously | 10240 | 
+| connection_tcp_buffer_bytes | Buffer to be allocated per client | 4096 |
+| authenticate_timeout_milliseconds | Time to wait for authentication from client when tcp connection is established | 300 |
 
 ## Logging
 
@@ -49,9 +52,3 @@ To specify logging directive, use `KVSD_LOG` environment variable.
 ```console
 $ KVSD_LOG=info kvsd
 ```
-
-## TODO
-
-- [ ] Remove `unreachable!() macro`
-- [ ] Use derive to reduce message/uow boiler plate code
-- [ ] Closing files during graceful shutdown
