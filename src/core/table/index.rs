@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use tokio::prelude::io::AsyncReadExt;
+use tokio::io::AsyncReadExt;
 
 use crate::common::Result;
 use crate::core::table::entry::Entry;

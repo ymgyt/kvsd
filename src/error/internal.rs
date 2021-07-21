@@ -126,6 +126,10 @@ impl From<serde_yaml::Error> for Error {
     }
 }
 
+impl From<tokio::sync::AcquireError> for Error {
+    fn from(err: tokio::sync::AcquireError) -> Self { Error::from(ErrorKind::Internal(err.to_string()))}
+}
+
 impl Error {
     pub fn kind(&self) -> &ErrorKind {
         &self.kind

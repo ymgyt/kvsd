@@ -504,9 +504,10 @@ impl SemaphoreListener {
         }
     }
 
-    async fn accept(&mut self) -> std::io::Result<(TcpStream, std::net::SocketAddr)> {
-        self.max_connections.acquire().await.forget();
-        self.inner.accept().await
+    async fn accept(&mut self) -> Result<(TcpStream, std::net::SocketAddr)> {
+        self.max_connections.acquire().await?.forget();
+        let stream = self.inner.accept().await?;
+        Ok(stream)
     }
 }
 

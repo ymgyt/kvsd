@@ -149,7 +149,7 @@ impl Frame {
                 if src.remaining() < n {
                     return Err(Error::Incomplete);
                 }
-                let value = Vec::from(&src.bytes()[..len]);
+                let value = Vec::from(&src.chunk()[..len]);
 
                 cursor::skip(src, n)?;
 

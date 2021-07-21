@@ -5,7 +5,7 @@ use kvsd::client::Api;
 pub fn ping(c: &mut Criterion) {
     const NUM_PING: usize = 100;
 
-    let addr = ("localhost", 7379);
+    let addr = ("127.0.0.1", 7379);
     let rt = rt();
 
     c.bench_function("ping", |b| {
@@ -29,7 +29,7 @@ pub fn ping(c: &mut Criterion) {
 
 pub fn set(c: &mut Criterion) {
     const NUM_SET: usize = 10;
-    let addr = ("localhost", 7379);
+    let addr = ("127.0.0.1", 7379);
 
     let rt = rt();
 
