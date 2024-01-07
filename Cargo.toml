@@ -31,7 +31,7 @@ clap = "2.33.3"
 atoi = "0.3.3"
 serde_yaml = "0.8.14"
 serde = { version = "1.0.117" , features = ["derive"] }
-rand = "0.7.3"
+rand = "0.8"
 
 [dev-dependencies]
 tokio-test = "0.4.2"
