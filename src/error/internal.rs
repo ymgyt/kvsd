@@ -13,6 +13,7 @@ use crate::protocol::message::{FrameError, ParseError};
 #[derive(Debug)]
 pub(crate) struct Error {
     kind: ErrorKind,
+    #[allow(dead_code)]
     backtrace: Option<Backtrace>,
 }
 
@@ -127,7 +128,9 @@ impl From<serde_yaml::Error> for Error {
 }
 
 impl From<tokio::sync::AcquireError> for Error {
-    fn from(err: tokio::sync::AcquireError) -> Self { Error::from(ErrorKind::Internal(err.to_string()))}
+    fn from(err: tokio::sync::AcquireError) -> Self {
+        Error::from(ErrorKind::Internal(err.to_string()))
+    }
 }
 
 impl Error {
