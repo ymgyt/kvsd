@@ -5,7 +5,7 @@ fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_env("KVSD_LOG"))
         .with_target(true)
-        .with_timer(tracing_subscriber::fmt::time::ChronoLocal::rfc3339())
+        .with_timer(tracing_subscriber::fmt::time::ChronoLocal::rfc_3339())
         .with_thread_ids(true)
         .init();
 
