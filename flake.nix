@@ -91,4 +91,10 @@
         };
         devShells.ci = craneLib.devShell { packages = ci_packages; };
       });
+
+  nixConfig = {
+    extra-substituters = [ "https://kvsd.cachix.org" ];
+    extra-trusted-public-keys =
+      [ "kvsd.cachix.org-1:d4Vo1Qh1YC2H0kzCNapMJlP50J3JAydbP9cA+phQf/k=" ];
+  };
 }
