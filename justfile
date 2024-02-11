@@ -1,4 +1,4 @@
-set shell := ["nu", "-c"]
+# set shell := ["nu", "-c"]
 
 # List recipe
 default:
