@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::str::FromStr;
 
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{Arg, ArgMatches, Command};
 
 use crate::cli::{root::MUST_ARG_DISABLE_TLS, SERVER};
 use crate::common::debug;
@@ -19,73 +19,64 @@ const MUST_ARG_KVSD_DIR: &str = "kvsd_dir";
 const MUST_ARG_TLS_CERT: &str = "tls_cert";
 const MUST_ARG_TLS_KEY: &str = "tls_key";
 
-pub(super) fn subcommand() -> App<'static, 'static> {
-    SubCommand::with_name(SERVER)
+pub(super) fn subcommand() -> Command {
+    Command::new(SERVER)
         .about("Running kvsd server")
         .arg(
-            Arg::with_name(ARG_MAX_CONN)
+            Arg::new(ARG_MAX_CONN)
                 .long("max-connections")
-                .takes_value(true)
                 .env("KVSD_SERVER_MAX_CONNECTIONS")
                 .help("Max tcp connections"),
         )
         .arg(
-            Arg::with_name(ARG_CONNECTION_TCP_BUFFER_BYTES)
+            Arg::new(ARG_CONNECTION_TCP_BUFFER_BYTES)
                 .long("connection-tcp-buffer-bytes")
-                .takes_value(true)
                 .env("KVSD_SERVER_CONNECTION_TCP_BUFFER_BYTES")
                 .help("Buffer bytes assigned to each tcp connection"),
         )
         .arg(
-            Arg::with_name(ARG_AUTHENTICATE_TIMEOUT_MILLISECONDS)
+            Arg::new(ARG_AUTHENTICATE_TIMEOUT_MILLISECONDS)
                 .long("authenticate-timeout-milliseconds")
-                .takes_value(true)
                 .env("KVSD_SERVER_AUTHENTICATE_TIMEOUT_MILLISECONDS")
                 .help("Authenticate timeout."),
         )
         .arg(
-            Arg::with_name(ARG_CONFIG_PATH)
+            Arg::new(ARG_CONFIG_PATH)
                 .long("config")
-                .short("C")
+                .short('C')
                 .default_value("./files/config.yaml")
-                .takes_value(true)
                 .env("KVSD_SERVER_CONFIG_PATH")
                 .help("Configuration file path"),
         )
         .arg(
-            Arg::with_name(ARG_HOST)
+            Arg::new(ARG_HOST)
                 .long("bind-host")
-                .takes_value(true)
                 .env("KVSD_SERVER_HOST")
                 .help("Tcp binding address host(ex 0.0.0.0, localhost)"),
         )
         .arg(
-            Arg::with_name(ARG_PORT)
+            Arg::new(ARG_PORT)
                 .long("bind-port")
-                .takes_value(true)
                 .env("KVSD_SERVER_PORT")
                 .help("Tcp binding address port"),
         )
         .arg(
-            Arg::with_name(MUST_ARG_KVSD_DIR)
+            Arg::new(MUST_ARG_KVSD_DIR)
                 .long("kvsd-dir")
-                .takes_value(true)
                 .default_value(".kvsd")
                 .env("KVSD_DIR")
                 .help("root directory where kvsd store it's data"),
         )
         .arg(
-            Arg::with_name(MUST_ARG_TLS_CERT)
+            Arg::new(MUST_ARG_TLS_CERT)
                 .long("cert")
-                .takes_value(true)
                 .default_value("./files/localhost.pem")
                 .env("KVSD_TLS_CERT")
                 .help("tls server certificate file path"),
         )
         .arg(
-            Arg::with_name(MUST_ARG_TLS_KEY)
+            Arg::new(MUST_ARG_TLS_KEY)
                 .long("key")
-                .takes_value(true)
                 .default_value("./files/localhost.key")
                 .env("KVSD_TLS_KEY")
                 .help("tls server private key file path"),
@@ -93,14 +84,17 @@ pub(super) fn subcommand() -> App<'static, 'static> {
 }
 
 /// Launch the server command.
-pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
+pub async fn run(m: &ArgMatches) -> Result<()> {
     let config_path = m
-        .value_of(ARG_CONFIG_PATH)
+        .get_one::<String>(ARG_CONFIG_PATH)
         .and_then(|s| std::path::PathBuf::from_str(s).ok())
         .unwrap();
 
     // Canonicalize require path already exist.
-    let root_dir = m.value_of(MUST_ARG_KVSD_DIR).map(Path::new).unwrap();
+    let root_dir = m
+        .get_one::<String>(MUST_ARG_KVSD_DIR)
+        .map(Path::new)
+        .unwrap();
     tokio::fs::create_dir_all(root_dir).await?;
     let root_dir = root_dir.canonicalize().unwrap();
 
@@ -123,23 +117,22 @@ pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
         .map_err(KvsdError::from)
 }
 
-fn read_server_config(m: &ArgMatches<'_>) -> ServerConfig {
+fn read_server_config(m: &ArgMatches) -> ServerConfig {
     let mut config = ServerConfig::default();
 
-    config.set_max_tcp_connections(m.value_of(ARG_MAX_CONN).and_then(|s| s.parse().ok()));
+    config.set_max_tcp_connections(m.get_one::<u32>(ARG_MAX_CONN).cloned());
     config.set_connection_tcp_buffer_bytes(
-        m.value_of(ARG_CONNECTION_TCP_BUFFER_BYTES)
-            .and_then(|s| s.parse().ok()),
+        m.get_one::<usize>(ARG_CONNECTION_TCP_BUFFER_BYTES).cloned(),
     );
     config.set_authenticate_timeout_milliseconds(
-        m.value_of(ARG_AUTHENTICATE_TIMEOUT_MILLISECONDS)
-            .and_then(|s| s.parse().ok()),
+        m.get_one::<u64>(ARG_AUTHENTICATE_TIMEOUT_MILLISECONDS)
+            .cloned(),
     );
-    config.set_listen_host(&mut m.value_of(ARG_HOST).map(String::from));
-    config.set_listen_port(&mut m.value_of(ARG_PORT).map(String::from));
-    config.set_disable_tls(&mut Some(m.is_present(MUST_ARG_DISABLE_TLS)));
-    config.set_tls_certificate(&mut m.value_of(MUST_ARG_TLS_CERT).map(String::from));
-    config.set_tls_key(&mut m.value_of(MUST_ARG_TLS_KEY).map(String::from));
+    config.set_listen_host(&mut m.get_one::<String>(ARG_HOST).map(String::from));
+    config.set_listen_port(&mut m.get_one::<String>(ARG_PORT).map(String::from));
+    config.set_disable_tls(&mut Some(m.contains_id(MUST_ARG_DISABLE_TLS)));
+    config.set_tls_certificate(&mut m.get_one::<String>(MUST_ARG_TLS_CERT).map(String::from));
+    config.set_tls_key(&mut m.get_one::<String>(MUST_ARG_TLS_KEY).map(String::from));
 
     config
 }

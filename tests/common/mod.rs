@@ -1,3 +1,3 @@
-pub fn temp_dir() -> tempdir::TempDir {
-    tempdir::TempDir::new("kvsd").unwrap()
+pub fn temp_dir() -> tempfile::TempDir {
+    tempfile::TempDir::new().unwrap()
 }

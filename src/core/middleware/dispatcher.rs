@@ -25,7 +25,7 @@ impl Dispatcher {
     {
         self.table
             .entry(namespace.into())
-            .or_insert_with(HashMap::new)
+            .or_default()
             .insert(table.into(), sender);
     }
 

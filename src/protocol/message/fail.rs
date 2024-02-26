@@ -64,13 +64,12 @@ impl Fail {
         Ok(Fail::new(FailCode::from(code)).with_message(message))
     }
 }
-
-impl Into<MessageFrames> for Fail {
-    fn into(self) -> MessageFrames {
+impl From<Fail> for MessageFrames {
+    fn from(fail: Fail) -> Self {
         let mut frames = MessageFrames::with_capacity(MessageType::Fail, 1);
 
-        frames.push_string(self.code.to_string());
-        frames.push_string(self.message);
+        frames.push_string(fail.code.to_string());
+        frames.push_string(fail.message);
 
         frames
     }

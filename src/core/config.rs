@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 
 /// kvsd configuration.
-#[derive(Debug, Deserialize)]
+#[derive(Default, Debug, Deserialize)]
 pub struct Config {
     /// authenticated principal users.
     pub users: Vec<UserEntry>,
@@ -18,13 +18,4 @@ pub struct UserEntry {
     pub username: String,
     /// password.
     pub password: String,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            users: Vec::new(),
-            root_dir: None,
-        }
-    }
 }

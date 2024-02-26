@@ -31,12 +31,12 @@ impl Authenticate {
     }
 }
 
-impl Into<MessageFrames> for Authenticate {
-    fn into(self) -> MessageFrames {
+impl From<Authenticate> for MessageFrames {
+    fn from(auth: Authenticate) -> Self {
         let mut frames = MessageFrames::with_capacity(MessageType::Authenticate, 2);
 
-        frames.push_string(self.username);
-        frames.push_string(self.password);
+        frames.push_string(auth.username);
+        frames.push_string(auth.password);
 
         frames
     }

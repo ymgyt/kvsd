@@ -16,10 +16,23 @@ default = ["cli"]
 cli = ["tracing-subscriber"]
 
 [dependencies]
-tokio = { version = "1.35", features = ["rt", "rt-multi-thread", "io-util", "net", "signal", "fs","sync", "macros", "time"] }
+tokio = { version = "1.35", features = [
+  "rt",
+  "rt-multi-thread",
+  "io-util",
+  "net",
+  "signal",
+  "fs",
+  "sync",
+  "macros",
+  "time",
+] }
 tokio-rustls = { version = "0.22.0", features = ["dangerous_configuration"] }
 tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", optional = true, features = ["chrono", "env-filter"]}
+tracing-subscriber = { version = "0.3.18", optional = true, features = [
+  "chrono",
+  "env-filter",
+] }
 tracing-futures = "0.2.4"
 async-trait = "0.1.41"
 bytes = "1.0.1"
@@ -27,15 +40,15 @@ chrono = "0.4.19"
 backtrace = "0.3.53"
 crc32fast = "1.2.1"
 num_cpus = "1.13.0"
-clap = "2.33.3"
+clap = { version = "4", features = ["env"] }
 atoi = "0.3.3"
 serde_yaml = "0.8.14"
-serde = { version = "1.0.117" , features = ["derive"] }
+serde = { version = "1.0.117", features = ["derive"] }
 rand = "0.8"
 
 [dev-dependencies]
 tokio-test = "0.4.2"
-tempdir = "0.3.7"
+tempfile = "3"
 criterion = "0.3"
 
 [[bench]]

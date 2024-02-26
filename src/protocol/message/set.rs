@@ -20,13 +20,12 @@ impl Set {
         Ok(Set::new(key, value))
     }
 }
-
-impl Into<MessageFrames> for Set {
-    fn into(self) -> MessageFrames {
+impl From<Set> for MessageFrames {
+    fn from(set: Set) -> Self {
         let mut frames = MessageFrames::with_capacity(MessageType::Set, 2);
 
-        frames.push_string(self.key.into_string());
-        frames.push_bytes(self.value.into_boxed_bytes());
+        frames.push_string(set.key.into_string());
+        frames.push_bytes(set.value.into_boxed_bytes());
 
         frames
     }

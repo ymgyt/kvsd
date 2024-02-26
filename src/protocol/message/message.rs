@@ -16,9 +16,9 @@ pub(crate) enum MessageType {
     Delete = 7,
 }
 
-impl Into<u8> for MessageType {
-    fn into(self) -> u8 {
-        self as u8
+impl From<MessageType> for u8 {
+    fn from(value: MessageType) -> Self {
+        value as u8
     }
 }
 
@@ -74,9 +74,9 @@ impl Message {
     }
 }
 
-impl Into<MessageFrames> for Message {
-    fn into(self) -> MessageFrames {
-        match self {
+impl From<Message> for MessageFrames {
+    fn from(message: Message) -> Self {
+        match message {
             Message::Ping(m) => m.into(),
             Message::Authenticate(m) => m.into(),
             Message::Success(m) => m.into(),

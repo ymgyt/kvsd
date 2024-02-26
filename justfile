@@ -1,4 +1,4 @@
-# set shell := ["nu", "-c"]
+set shell := ["nu", "-c"]
 
 # List recipe
 default:
@@ -8,7 +8,13 @@ default:
 check:
   nix flake check --all-systems --accept-flake-config
 
+test *flags:
+	cargo nextest run {{ flags }}
+
 # Run integration test
 integration:
-	cargo nextest run integration --test integration_test --no-capture
+	cargo nextest run --test integration_test --no-capture
  
+# Run audit
+audit:
+    cargo audit

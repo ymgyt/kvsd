@@ -101,7 +101,7 @@ impl Entry {
         // Header
         writer.write_u64(self.header.key_bytes as u64).await?;
         writer.write_u64(self.header.value_bytes as u64).await?;
-        writer.write_i64(self.header.timestamp_ms as i64).await?;
+        writer.write_i64(self.header.timestamp_ms).await?;
         writer.write_u8(self.header.state as u8).await?;
         writer
             .write_u32(self.header.crc_checksum.unwrap_or(0))

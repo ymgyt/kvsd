@@ -29,7 +29,7 @@ fn key_value_crud() {
         let mut initializer = kvsd::config::Initializer::from_config(config);
 
         initializer.set_root_dir(root_dir.path());
-        initializer.set_listener(TcpListener::bind(addr.clone()).await.unwrap());
+        initializer.set_listener(TcpListener::bind(addr).await.unwrap());
 
         initializer.init_dir().await.unwrap();
 

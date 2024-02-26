@@ -28,12 +28,11 @@ impl Success {
         self.value
     }
 }
-
-impl Into<MessageFrames> for Success {
-    fn into(self) -> MessageFrames {
+impl From<Success> for MessageFrames {
+    fn from(success: Success) -> Self {
         let mut frames = MessageFrames::with_capacity(MessageType::Success, 1);
 
-        match self.value {
+        match success.value {
             Some(value) => frames.push_bytes(value.into_boxed_bytes()),
             None => frames.push_null(),
         }

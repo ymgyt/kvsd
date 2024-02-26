@@ -1,4 +1,4 @@
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{Arg, ArgMatches, Command};
 
 use crate::cli::{authenticate, DELETE};
 use crate::protocol::Key;
@@ -6,9 +6,9 @@ use crate::Result;
 
 const MUST_ARG_KEY: &str = "key";
 
-pub(super) fn subcommand() -> App<'static, 'static> {
-    SubCommand::with_name(DELETE).about("Delete value").arg(
-        Arg::with_name(MUST_ARG_KEY)
+pub(super) fn subcommand() -> Command {
+    Command::new(DELETE).about("Delete value").arg(
+        Arg::new(MUST_ARG_KEY)
             .index(1)
             .required(true)
             .help("Key")
@@ -17,8 +17,8 @@ pub(super) fn subcommand() -> App<'static, 'static> {
 }
 
 /// launch the delete command.
-pub async fn run(m: &ArgMatches<'_>) -> Result<()> {
-    let key = m.value_of(MUST_ARG_KEY).unwrap();
+pub async fn run(m: &ArgMatches) -> Result<()> {
+    let key = m.get_one::<String>(MUST_ARG_KEY).unwrap();
 
     let key = Key::new(key)?;
 

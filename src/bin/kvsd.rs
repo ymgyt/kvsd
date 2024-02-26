@@ -41,11 +41,11 @@ async fn run() {
 async fn run_inner() -> kvsd::Result<()> {
     let m = cli::new().get_matches();
     match m.subcommand() {
-        (cli::PING, Some(sm)) => cli::ping(sm).await,
-        (cli::SERVER, Some(sm)) => cli::server(sm).await,
-        (cli::SET, Some(sm)) => cli::set(sm).await,
-        (cli::GET, Some(sm)) => cli::get(sm).await,
-        (cli::DELETE, Some(sm)) => cli::delete(sm).await,
-        (_, _) => unreachable!(),
+        Some((cli::PING, sm)) => cli::ping(sm).await,
+        Some((cli::SERVER, sm)) => cli::server(sm).await,
+        Some((cli::SET, sm)) => cli::set(sm).await,
+        Some((cli::GET, sm)) => cli::get(sm).await,
+        Some((cli::DELETE, sm)) => cli::delete(sm).await,
+        _ => unreachable!(),
     }
 }

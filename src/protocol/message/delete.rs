@@ -21,11 +21,11 @@ impl Delete {
     }
 }
 
-impl Into<MessageFrames> for Delete {
-    fn into(self) -> MessageFrames {
+impl From<Delete> for MessageFrames {
+    fn from(delete: Delete) -> Self {
         let mut frames = MessageFrames::with_capacity(MessageType::Delete, 1);
 
-        frames.push_string(self.key.into_string());
+        frames.push_string(delete.key.into_string());
 
         frames
     }

@@ -44,12 +44,12 @@ impl Ping {
     }
 }
 
-impl Into<MessageFrames> for Ping {
-    fn into(self) -> MessageFrames {
+impl From<Ping> for MessageFrames {
+    fn from(ping: Ping) -> Self {
         let mut frames = MessageFrames::with_capacity(MessageType::Ping, 2);
 
-        frames.push_time_or_null(self.client_timestamp);
-        frames.push_time_or_null(self.server_timestamp);
+        frames.push_time_or_null(ping.client_timestamp);
+        frames.push_time_or_null(ping.server_timestamp);
 
         frames
     }

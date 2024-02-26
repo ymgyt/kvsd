@@ -84,6 +84,6 @@ impl Kvsd {
     }
 
     pub(crate) async fn handle_request(&mut self, uow: UnitOfWork) -> Result<()> {
-        return self.middlewares.apply(uow).await;
+        self.middlewares.apply(uow).await
     }
 }

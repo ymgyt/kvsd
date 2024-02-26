@@ -19,11 +19,11 @@ impl Get {
     }
 }
 
-impl Into<MessageFrames> for Get {
-    fn into(self) -> MessageFrames {
+impl From<Get> for MessageFrames {
+    fn from(get: Get) -> Self {
         let mut frames = MessageFrames::with_capacity(MessageType::Get, 1);
 
-        frames.push_string(self.key.into_string());
+        frames.push_string(get.key.into_string());
 
         frames
     }
