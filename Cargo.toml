@@ -36,7 +36,7 @@ tracing-subscriber = { version = "0.3.18", optional = true, features = [
 tracing-futures = "0.2.4"
 async-trait = "0.1.41"
 bytes = "1.0.1"
-chrono = "0.4.19"
+chrono = "0.4.34"
 backtrace = "0.3.53"
 crc32fast = "1.2.1"
 num_cpus = "1.13.0"
