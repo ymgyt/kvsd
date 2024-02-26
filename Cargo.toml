@@ -45,6 +45,8 @@ atoi = "0.3.3"
 serde_yaml = "0.8.14"
 serde = { version = "1.0.117", features = ["derive"] }
 rand = "0.8"
+# to avoid yanked deps
+iana-time-zone = "0.1.60"
 
 [dev-dependencies]
 tokio-test = "0.4.2"

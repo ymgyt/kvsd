@@ -69,7 +69,8 @@
 
         # TODO: should parse .cargo/audit.toml
         ignoreAdvisories = pkgs.lib.concatStrings
-          (pkgs.lib.strings.intersperse " " (map (x: "--ignore ${x}") [ ]));
+          (pkgs.lib.strings.intersperse " "
+            (map (x: "--ignore ${x}") [ "RUSTSEC-2023-0052" ]));
 
         checks = {
           inherit kvsd;

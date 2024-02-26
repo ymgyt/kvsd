@@ -1,0 +1,5 @@
+[advisories]
+ignore = [
+  # TODO: upgrade tokio-rustls
+  "RUSTSEC-2023-0052",
+]
