@@ -18,3 +18,6 @@ integration:
 # Run audit
 audit:
     cargo audit
+
+changelog *flags:
+	git cliff out> CHANGELOG.md
