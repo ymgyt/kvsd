@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use tokio::net::TcpListener;
 
@@ -40,13 +40,27 @@ fn key_value_crud() {
         let server_handler =
             tokio::spawn(async move { initializer.run_kvsd(shutdown2.notified()).await });
 
-        let mut client =
-            kvsd::client::tcp::UnauthenticatedClient::insecure_from_addr(addr.0, addr.1)
-                .await
-                .unwrap()
-                .authenticate("test", "test")
-                .await
-                .unwrap();
+        let client = {
+            let mut retry = 0;
+            let max_retry = 3;
+            loop {
+                match kvsd::client::tcp::UnauthenticatedClient::insecure_from_addr(addr.0, addr.1)
+                    .await
+                {
+                    Ok(client) => break client,
+                    Err(err) => {
+                        retry += 1;
+                        if retry > max_retry {
+                            panic!("{:?}", err);
+                        }
+                        tracing::warn!("{err:?}");
+                        tokio::time::sleep(Duration::from_secs(3)).await;
+                    }
+                }
+            }
+        };
+
+        let mut client = client.authenticate("test", "test").await.unwrap();
 
         // Ping
         let ping_duration = client.ping().await.unwrap();

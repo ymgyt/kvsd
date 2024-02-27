@@ -65,12 +65,12 @@
         kvsd = craneLib.buildPackage (commonArgs // {
           inherit cargoArtifacts;
           inherit (kvsdCrate) pname version;
+          doCheck = false;
         });
 
         # TODO: should parse .cargo/audit.toml
         ignoreAdvisories = pkgs.lib.concatStrings
-          (pkgs.lib.strings.intersperse " "
-            (map (x: "--ignore ${x}") [ "RUSTSEC-2023-0052" ]));
+          (pkgs.lib.strings.intersperse " " (map (x: "--ignore ${x}") [ ]));
 
         checks = {
           inherit kvsd;
@@ -80,8 +80,10 @@
             cargoClippyExtraArgs = "-- --deny warnings";
           });
 
-          nextest =
-            craneLib.cargoNextest (commonArgs // { inherit cargoArtifacts; });
+          nextest = craneLib.cargoNextest (commonArgs // {
+            inherit cargoArtifacts;
+            cargoExtraArgs = "--no-capture";
+          });
 
           audit = craneLib.cargoAudit {
             inherit src advisory-db;
@@ -129,6 +131,7 @@
   nixConfig = {
     extra-substituters = [ "https://kvsd.cachix.org" ];
     extra-trusted-public-keys =
-      [ "Keykvsd.cachix.org-1:d4Vo1Qh1YC2H0kzCNapMJlP50J3JAydbP9cA+phQf/k=" ];
+      [ "kvsd.cachix.org-1:d4Vo1Qh1YC2H0kzCNapMJlP50J3JAydbP9cA+phQf/k=" ];
+
   };
 }
