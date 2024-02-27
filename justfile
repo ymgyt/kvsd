@@ -21,3 +21,6 @@ audit:
 
 changelog *flags:
 	git cliff out> CHANGELOG.md
+
+release *flags: changelog
+	cargo release {{ flags }}

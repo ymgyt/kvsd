@@ -57,3 +57,13 @@ criterion = "0.5"
 [[bench]]
 name = "kvsd_benchmark"
 harness = false
+
+[metadata.release]
+allow-branch = ["main"]
+pre-release-commit-message = "chore: release"
+
+pre-release-replacements = [
+  { file = "CHANGELOG.md", search = "[unreleased]", replace = "[{{{{version}}] {{date}}" },
+]
+
+tag-message = "chore: release {{crate_name}} version {{version}}"
