@@ -1,4 +1,4 @@
-use clap::{Arg, ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgMatches, Command};
 
 use crate::cli;
 use crate::client::tcp::UnauthenticatedClient;
@@ -50,6 +50,7 @@ pub fn new() -> Command {
         .arg(
             Arg::new(MUST_ARG_DISABLE_TLS)
                 .long("disable-tls")
+                .action(ArgAction::SetTrue)
                 .env("KVSD_DISABLE_TLS")
                 .help("disable tls connections")
                 .global(true),

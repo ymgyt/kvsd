@@ -1,13 +1,18 @@
-use std::io;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
+use std::{convert::TryFrom, io};
 
 use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
-use tokio_rustls::client::TlsStream;
-use tokio_rustls::rustls::ServerCertVerified;
-use tokio_rustls::{rustls, webpki, TlsConnector};
+use tokio_rustls::{
+    client::TlsStream,
+    rustls::{
+        client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
+        pki_types, SignatureScheme,
+    },
+};
+use tokio_rustls::{rustls, TlsConnector};
 
 use crate::client::Api;
 use crate::common::info;
@@ -84,17 +89,17 @@ impl UnauthenticatedClient<TlsStream<TcpStream>> {
             .to_socket_addrs()?
             .next()
             .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-
-        let mut tls_config = rustls::ClientConfig::new();
-        tls_config
+        let tls_config = rustls::ClientConfig::builder()
             .dangerous()
-            .set_certificate_verifier(Arc::new(DangerousServerCertVerifier::new()));
+            .with_custom_certificate_verifier(Arc::new(DangerousServerCertVerifier::new()))
+            .with_no_client_auth();
 
         let connector = TlsConnector::from(Arc::new(tls_config));
 
         // TODO: remove hard code
-        let domain = webpki::DNSNameRef::try_from_ascii_str("localhost")
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid host"))?;
+        let domain = pki_types::ServerName::try_from("localhost")
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid host"))?
+            .to_owned();
 
         info!(%addr,?domain, "Connecting");
 
@@ -165,6 +170,7 @@ where
     }
 }
 
+#[derive(Debug)]
 struct DangerousServerCertVerifier {}
 
 impl DangerousServerCertVerifier {
@@ -173,14 +179,50 @@ impl DangerousServerCertVerifier {
     }
 }
 
-impl rustls::ServerCertVerifier for DangerousServerCertVerifier {
+impl ServerCertVerifier for DangerousServerCertVerifier {
     fn verify_server_cert(
         &self,
-        _roots: &rustls::RootCertStore,
-        _presented_certs: &[rustls::Certificate],
-        _dns_name: webpki::DNSNameRef<'_>,
-        _oscp_response: &[u8],
-    ) -> Result<rustls::ServerCertVerified, rustls::TLSError> {
+        _end_entity: &pki_types::CertificateDer<'_>,
+        _intermediates: &[pki_types::CertificateDer<'_>],
+        _server_name: &pki_types::ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: pki_types::UnixTime,
+    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
         Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> std::prelude::v1::Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error>
+    {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        vec![
+            SignatureScheme::RSA_PKCS1_SHA1,
+            SignatureScheme::RSA_PKCS1_SHA256,
+            SignatureScheme::RSA_PKCS1_SHA384,
+            SignatureScheme::RSA_PKCS1_SHA512,
+            SignatureScheme::ECDSA_NISTP256_SHA256,
+            SignatureScheme::ECDSA_NISTP384_SHA384,
+            SignatureScheme::ECDSA_NISTP521_SHA512,
+            SignatureScheme::ED25519,
+            SignatureScheme::RSA_PSS_SHA256,
+            SignatureScheme::RSA_PSS_SHA384,
+            SignatureScheme::RSA_PSS_SHA512,
+        ]
     }
 }

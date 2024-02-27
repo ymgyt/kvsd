@@ -4,12 +4,13 @@ use std::sync::{
     Arc,
 };
 
+use rustls_pemfile::rsa_private_keys;
 use serde::Deserialize;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc, Semaphore};
 use tokio::time::{timeout, Duration};
-use tokio_rustls::rustls;
+use tokio_rustls::rustls::{self, pki_types};
 use tokio_rustls::server::TlsStream;
 use tokio_rustls::TlsAcceptor;
 
@@ -135,20 +136,20 @@ impl Config {
         self.disable_tls.unwrap_or(false)
     }
 
-    // TODO: handle err
-    fn load_certs(&self) -> Vec<rustls::Certificate> {
-        rustls::internal::pemfile::certs(&mut std::io::BufReader::new(
+    fn load_certs(&self) -> std::io::Result<Vec<pki_types::CertificateDer<'static>>> {
+        rustls_pemfile::certs(&mut std::io::BufReader::new(
             std::fs::File::open(self.tls_certificate.clone().unwrap()).unwrap(),
         ))
-        .unwrap()
+        .collect()
     }
 
-    // TODO: handle err
-    fn load_keys(&self) -> Vec<rustls::PrivateKey> {
-        rustls::internal::pemfile::pkcs8_private_keys(&mut std::io::BufReader::new(
+    fn load_keys(&self) -> std::io::Result<pki_types::PrivateKeyDer<'static>> {
+        rsa_private_keys(&mut std::io::BufReader::new(
             std::fs::File::open(self.tls_key.clone().unwrap()).unwrap(),
         ))
+        .next()
         .unwrap()
+        .map(Into::into)
     }
 }
 
@@ -249,11 +250,14 @@ impl Server {
             }
         } else {
             // Setup TLS
-            let mut tls_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
 
-            let certs = self.config.load_certs();
-            let mut keys = self.config.load_keys();
-            tls_config.set_single_cert(certs, keys.remove(0)).unwrap();
+            let certs = self.config.load_certs().unwrap();
+            let key = self.config.load_keys().unwrap();
+
+            let tls_config = rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_single_cert(certs, key)
+                .unwrap();
 
             let tls_acceptor = TlsAcceptor::from(Arc::new(tls_config));
 
