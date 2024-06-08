@@ -2,7 +2,7 @@
   description = "kvsd";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/release-23.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
 
     fenix = {
       url = "github:nix-community/fenix";
@@ -101,7 +101,7 @@
 
         # Inherits from checks cargo-nextest, cargo-audit
         dev_packages = with pkgs;
-          [ nixfmt git-cliff cargo-release oranda ] ++ ci_packages
+          [ git-cliff cargo-release oranda ] ++ ci_packages
           ## For cargo-release build
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin darwinDeps;
 

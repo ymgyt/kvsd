@@ -1,0 +1,6 @@
+include = ["*.toml"]
+
+[formatting]
+align_entries = true
+column_width = 200
+reorder_keys = true
