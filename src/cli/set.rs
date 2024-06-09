@@ -1,44 +1,28 @@
-use clap::{Arg, ArgMatches, Command};
+use clap::Args;
 
-use crate::cli::{authenticate, SET};
+use crate::client::Api;
 use crate::protocol::{Key, Value};
 use crate::Result;
 
-const MUST_ARG_KEY: &str = "set_key";
-const MUST_ARG_VALUE: &str = "set_value";
-
-pub(super) fn subcommand() -> Command {
-    Command::new(SET)
-        .about("Set key value")
-        .arg(
-            Arg::new(MUST_ARG_KEY)
-                .index(1)
-                .required(true)
-                .help("Key")
-                .value_name("KEY"),
-        )
-        .arg(
-            Arg::new(MUST_ARG_VALUE)
-                .index(2)
-                .required(true)
-                .help("Value")
-                .value_name("VALUE"),
-        )
+#[derive(Args, Debug)]
+pub struct SetCommand {
+    #[arg(value_name = "KEY", index = 1)]
+    key: String,
+    #[arg(value_name = "VALUE", index = 2)]
+    value: String,
 }
 
-/// Launch the set command.
-pub async fn run(m: &ArgMatches) -> Result<()> {
-    let key = m.get_one::<String>(MUST_ARG_KEY).unwrap();
-    let value = m.get_one::<String>(MUST_ARG_VALUE).unwrap();
+impl SetCommand {
+    pub async fn run(self, mut client: Box<dyn Api>) -> Result<()> {
+        let SetCommand { key, value } = self;
 
-    let key = Key::new(key)?;
-    let value = Value::new(value.as_bytes())?;
+        let key = Key::new(key)?;
+        let value = Value::new(value.as_bytes())?;
 
-    let mut client = authenticate(m).await?;
+        if client.set(key, value).await.is_ok() {
+            println!("OK");
+        }
 
-    if client.set(key, value).await.is_ok() {
-        println!("OK");
+        Ok(())
     }
-
-    Ok(())
 }

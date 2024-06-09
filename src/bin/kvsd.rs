@@ -1,4 +1,8 @@
-use kvsd::{self, cli, KvsdError};
+use kvsd::{
+    self,
+    cli::{self, authenticate, Command},
+    KvsdError,
+};
 
 fn main() {
     // Install global collector configured based on KVS_LOG env var.
@@ -39,13 +43,13 @@ async fn run() {
 }
 
 async fn run_inner() -> kvsd::Result<()> {
-    let m = cli::new().get_matches();
-    match m.subcommand() {
-        Some((cli::PING, sm)) => cli::ping(sm).await,
-        Some((cli::SERVER, sm)) => cli::server(sm).await,
-        Some((cli::SET, sm)) => cli::set(sm).await,
-        Some((cli::GET, sm)) => cli::get(sm).await,
-        Some((cli::DELETE, sm)) => cli::delete(sm).await,
-        _ => unreachable!(),
+    // let m = cli::new().get_matches();
+    let cli::KvsdCommand { client, command } = cli::parse();
+    match command {
+        Command::Ping(ping) => ping.run(authenticate(client).await?).await,
+        Command::Delete(delete) => delete.run(authenticate(client).await?).await,
+        Command::Get(get) => get.run(authenticate(client).await?).await,
+        Command::Set(set) => set.run(authenticate(client).await?).await,
+        Command::Server(server) => server.run(client.disable_tls).await,
     }
 }

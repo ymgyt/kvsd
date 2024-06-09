@@ -1,37 +1,31 @@
-use clap::{Arg, ArgMatches, Command};
+use clap::Args;
 
-use crate::cli::{authenticate, PING};
+use crate::client::Api;
 use crate::Result;
 
-const MUST_ARG_PING_COUNT: &str = "count";
-
-pub(super) fn subcommand() -> Command {
-    Command::new(PING).about("Ping to kvsd server").arg(
-        Arg::new(MUST_ARG_PING_COUNT)
-            .long("count")
-            .short('c')
-            .default_value("1")
-            .help("Ping counts"),
-    )
+#[derive(Args, Debug)]
+pub struct PingCommand {
+    /// Ping counts
+    #[arg(long, short = 'c', default_value_t = 1)]
+    count: usize,
 }
 
-/// Launch the ping command.
-pub async fn run(m: &ArgMatches) -> Result<()> {
-    let count = m.get_one::<i32>(MUST_ARG_PING_COUNT).unwrap_or(&1);
-    let mut current = 1;
+impl PingCommand {
+    pub async fn run(self, mut client: Box<dyn Api>) -> Result<()> {
+        let PingCommand { count } = self;
 
-    let mut client = authenticate(m).await?;
+        let mut current = 1;
+        while current <= count {
+            let latency = client.ping().await?;
+            println!(
+                "ping (latency {}ms) {}/{}",
+                latency.num_milliseconds(),
+                current,
+                count
+            );
+            current += 1;
+        }
 
-    while current <= *count {
-        let latency = client.ping().await?;
-        println!(
-            "ping (latency {}ms) {}/{}",
-            latency.num_milliseconds(),
-            current,
-            count
-        );
-        current += 1;
+        Ok(())
     }
-
-    Ok(())
 }

@@ -32,7 +32,7 @@
           sha256 = "sha256-e4mlaJehWBymYxJGgnbuCObVlqMlQSilZ8FljG9zPHY=";
         };
 
-        craneLib = crane.lib.${system}.overrideToolchain rustToolchain;
+        craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
         src = pkgs.lib.cleanSourceWith {
           src = ./.; # The original, unfiltered source
@@ -56,6 +56,7 @@
 
           buildInputs = [ ]
             ++ pkgs.lib.optionals pkgs.stdenv.isDarwin darwinDeps;
+          CARGO_PROFILE = "dev";
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
@@ -66,11 +67,8 @@
           inherit cargoArtifacts;
           inherit (kvsdCrate) pname version;
           doCheck = false;
+          CARGO_PROFILE = "release";
         });
-
-        # TODO: should parse .cargo/audit.toml
-        ignoreAdvisories = pkgs.lib.concatStrings
-          (pkgs.lib.strings.intersperse " " (map (x: "--ignore ${x}") [ ]));
 
         checks = {
           inherit kvsd;
@@ -87,7 +85,12 @@
 
           audit = craneLib.cargoAudit {
             inherit src advisory-db;
-            cargoAuditExtraArgs = "--ignore yanked ${ignoreAdvisories}";
+            cargoAuditExtraArgs = let
+              ignoreAdvisories = pkgs.lib.concatStrings
+                (pkgs.lib.strings.intersperse " " (map (x: "--ignore ${x}")
+                  (builtins.fromTOML
+                    (builtins.readFile .cargo/audit.toml)).advisories.ignore));
+            in "${ignoreAdvisories}";
           };
 
           fmt = craneLib.cargoFmt commonArgs;

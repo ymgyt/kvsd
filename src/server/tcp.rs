@@ -1,7 +1,10 @@
 use std::future::Future;
-use std::sync::{
-    atomic::{AtomicU32, Ordering},
-    Arc,
+use std::{
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
 };
 
 use rustls_pemfile::rsa_private_keys;
@@ -36,9 +39,9 @@ pub struct Config {
     // disable tls connections.
     disable_tls: Option<bool>,
     // tls server certificate file path
-    tls_certificate: Option<String>,
+    tls_certificate: Option<PathBuf>,
     // tls server private key file path
-    tls_key: Option<String>,
+    tls_key: Option<PathBuf>,
 }
 
 impl Config {
@@ -78,14 +81,14 @@ impl Config {
             self.disable_tls = Some(val)
         }
     }
-    pub fn set_tls_certificate(&mut self, val: &mut Option<String>) {
+    pub fn set_tls_certificate(&mut self, val: &mut Option<PathBuf>) {
         if let Some(val) = val.take() {
-            self.tls_certificate = Some(val)
+            self.tls_certificate = Some(val);
         }
     }
-    pub fn set_tls_key(&mut self, val: &mut Option<String>) {
+    pub fn set_tls_key(&mut self, val: &mut Option<PathBuf>) {
         if let Some(val) = val.take() {
-            self.tls_key = Some(val)
+            self.tls_key = Some(val);
         }
     }
     pub(crate) fn override_merge(&mut self, other: &mut Config) {

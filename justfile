@@ -1,5 +1,8 @@
 set shell := ["nu", "-c"]
 
+arch := arch()
+os := if os() == "macos" { "darwin" } else { "linux" }
+
 # List recipe
 default:
   just --list
@@ -17,7 +20,7 @@ integration:
  
 # Run audit
 audit:
-    cargo audit
+    nix build .#checks.{{arch}}-{{os}}.audit --print-build-logs 
 
 changelog *flags:
 	git cliff out> CHANGELOG.md
