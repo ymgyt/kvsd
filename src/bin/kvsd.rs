@@ -51,5 +51,6 @@ async fn run_inner() -> kvsd::Result<()> {
         Command::Get(get) => get.run(authenticate(client).await?).await,
         Command::Set(set) => set.run(authenticate(client).await?).await,
         Command::Server(server) => server.run(client.disable_tls).await,
+        Command::Admin(admin) => admin.run().await,
     }
 }

@@ -11,6 +11,10 @@ default:
 check:
   nix flake check --all-systems --accept-flake-config
 
+# Run clippy
+lint: 
+	cargo clippy --all-features --tests --benches
+
 test *flags:
 	cargo nextest run {{ flags }}
 

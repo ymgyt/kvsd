@@ -14,22 +14,24 @@ use crate::protocol::{Key, Value};
 pub(crate) struct Table<File = fs::File> {
     file: File,
     index: Index,
-    receiver: Receiver<UnitOfWork>,
+    // receiver: Receiver<UnitOfWork>,
 }
 
 impl Table<fs::File> {
     pub(crate) async fn from_path(
-        receiver: Receiver<UnitOfWork>,
+        // receiver: Receiver<UnitOfWork>,
         path: impl AsRef<Path>,
     ) -> Result<Self> {
         let f = fs::OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(path.as_ref())
             .await?;
 
-        Table::new(receiver, f).await
+        // Table::new(receiver, f).await
+        Table::new(f).await
     }
 }
 
@@ -37,7 +39,10 @@ impl<File> Table<File>
 where
     File: AsyncWrite + AsyncRead + AsyncSeek + Unpin,
 {
-    pub(crate) async fn new(receiver: Receiver<UnitOfWork>, mut file: File) -> Result<Self> {
+    pub(crate) async fn new(
+        // receiver: Receiver<UnitOfWork>,
+        mut file: File,
+    ) -> Result<Self> {
         let pos = file.seek(SeekFrom::Current(0)).await?;
         info!("initial pos {}", pos);
 
@@ -49,12 +54,12 @@ where
         Ok(Self {
             file,
             index,
-            receiver,
+            // receiver,
         })
     }
 
-    pub(crate) async fn run(mut self) {
-        while let Some(uow) = self.receiver.recv().await {
+    pub(crate) async fn run(mut self, mut receiver: Receiver<UnitOfWork>) {
+        while let Some(uow) = receiver.recv().await {
             if let Err(err) = self.handle_uow(uow).await {
                 error!("handle uow {}", err);
             }

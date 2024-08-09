@@ -43,9 +43,9 @@ impl Builder {
             .join(filepath::NS_DEFAULT)
             .join("default/default.kvsd");
         debug!("Open default table file {}", default_table.display());
-        let default_table = Table::from_path(rx, default_table).await?;
+        let default_table = Table::from_path(default_table).await?;
 
-        tokio::spawn(default_table.run());
+        tokio::spawn(default_table.run(rx));
 
         let mut dispatcher = Dispatcher::new();
         dispatcher.add_table("default", "default", tx);
