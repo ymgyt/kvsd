@@ -1,6 +1,6 @@
 use clap::{ArgAction, Args, Parser, Subcommand};
 
-use crate::cli::{admin, delete, get, ping, server, set};
+use crate::cli::{delete, get, ping, server, set};
 use crate::client::tcp::UnauthenticatedClient;
 use crate::client::Api;
 use crate::server::DEFAULT_PORT;
@@ -50,8 +50,6 @@ pub enum Command {
     Set(set::SetCommand),
     /// Server
     Server(server::ServerCommand),
-    /// Admin
-    Admin(admin::AdminCommand),
 }
 
 /// Parse command line args

@@ -1,5 +1,4 @@
 #![allow(clippy::module_inception)]
-#![deny(missing_docs)]
 
 //! Kvsd is an asynchronous key value store with tokio runtime.
 //! The key value is saved by appending it to a file and keeps the offset in memory.

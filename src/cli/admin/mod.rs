@@ -1,26 +1,31 @@
 use crate::Result;
-use clap::{Args, Subcommand};
+use clap::{Parser, Subcommand};
 
-mod dump;
+mod table;
 
-#[derive(Args, Debug)]
-pub struct AdminCommand {
+/// Kvsadmin command
+#[derive(Parser, Debug)]
+#[command(version, propagate_version = true, subcommand_required = true)]
+pub struct KvsadminCommand {
     #[command(subcommand)]
-    command: Command,
+    pub command: Command,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    /// Dump table
-    Dump(dump::DumpCommand),
+    Table(table::TableCommand),
 }
 
-impl AdminCommand {
+impl KvsadminCommand {
     pub async fn run(self) -> Result<()> {
-        let AdminCommand { command } = self;
+        let KvsadminCommand { command } = self;
 
         match command {
-            Command::Dump(dump) => dump.run().await,
+            Command::Table(table) => table.run().await,
         }
     }
+}
+
+pub fn parse() -> KvsadminCommand {
+    KvsadminCommand::parse()
 }

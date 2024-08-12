@@ -1,13 +1,15 @@
 use kvsd::{
     self,
     cli::{self, authenticate, Command},
-    KvsdError,
+    config, KvsdError,
 };
 
 fn main() {
     // Install global collector configured based on KVS_LOG env var.
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_env("KVSD_LOG"))
+        .with_env_filter(tracing_subscriber::EnvFilter::from_env(
+            config::env::LOG_DIRECTIVE,
+        ))
         .with_target(true)
         .with_timer(tracing_subscriber::fmt::time::ChronoLocal::rfc_3339())
         .with_thread_ids(true)
@@ -51,6 +53,5 @@ async fn run_inner() -> kvsd::Result<()> {
         Command::Get(get) => get.run(authenticate(client).await?).await,
         Command::Set(set) => set.run(authenticate(client).await?).await,
         Command::Server(server) => server.run(client.disable_tls).await,
-        Command::Admin(admin) => admin.run().await,
     }
 }

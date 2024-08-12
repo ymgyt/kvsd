@@ -3,7 +3,7 @@
 mod root;
 pub use root::{authenticate, parse, Command, KvsdCommand};
 
-mod admin;
+pub mod admin;
 mod delete;
 mod get;
 mod ping;
