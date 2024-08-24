@@ -3,8 +3,11 @@ use std::convert::TryFrom;
 use chrono::Utc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::common::{Error, ErrorKind, Result};
 use crate::protocol::{Key, KeyValue, Value};
+use crate::{
+    common::{Error, ErrorKind, Result},
+    core::EntryDump,
+};
 
 // Entry represent unit of data that is subject to an operation.
 #[derive(PartialEq, Debug)]
@@ -327,5 +330,24 @@ mod tests {
 
             assert_eq!(None, index.lookup_offset("key1"))
         })
+    }
+}
+
+impl From<Entry> for EntryDump {
+    fn from(e: Entry) -> EntryDump {
+        let timestamp_ns = e.header.timestamp_ms;
+        let is_deleted = matches!(e.header.state, State::Deleted);
+        let key = e.body.key;
+        let value = match e.body.value {
+            Some(v) => v.into_vec(),
+            None => Vec::new(),
+        };
+
+        EntryDump {
+            timestamp_ns,
+            is_deleted,
+            key,
+            value,
+        }
     }
 }

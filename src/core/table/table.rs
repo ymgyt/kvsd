@@ -5,31 +5,31 @@ use tokio::io::{AsyncRead, AsyncSeek, AsyncSeekExt, AsyncWrite, SeekFrom};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot;
 
-use crate::common::{debug, error, info, trace, ErrorKind, Result};
 use crate::core::table::entry::Entry;
 use crate::core::table::index::Index;
 use crate::core::UnitOfWork;
 use crate::protocol::{Key, Value};
+use crate::{
+    common::{debug, error, info, trace, ErrorKind, Result},
+    core::table::dump::EntryDump,
+};
 
 pub(crate) struct Table<File = fs::File> {
     file: File,
     index: Index,
-    receiver: Receiver<UnitOfWork>,
 }
 
 impl Table<fs::File> {
-    pub(crate) async fn from_path(
-        receiver: Receiver<UnitOfWork>,
-        path: impl AsRef<Path>,
-    ) -> Result<Self> {
+    pub(crate) async fn from_path(path: impl AsRef<Path>) -> Result<Self> {
         let f = fs::OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(path.as_ref())
             .await?;
 
-        Table::new(receiver, f).await
+        Table::new(f).await
     }
 }
 
@@ -37,9 +37,9 @@ impl<File> Table<File>
 where
     File: AsyncWrite + AsyncRead + AsyncSeek + Unpin,
 {
-    pub(crate) async fn new(receiver: Receiver<UnitOfWork>, mut file: File) -> Result<Self> {
+    pub(crate) async fn new(mut file: File) -> Result<Self> {
         let pos = file.seek(SeekFrom::Current(0)).await?;
-        info!("initial pos {}", pos);
+        debug!("initial pos {}", pos);
 
         // TODO: Buffering
         let index = Index::from_reader(&mut file).await?;
@@ -49,12 +49,12 @@ where
         Ok(Self {
             file,
             index,
-            receiver,
+            // receiver,
         })
     }
 
-    pub(crate) async fn run(mut self) {
-        while let Some(uow) = self.receiver.recv().await {
+    pub(crate) async fn run(mut self, mut receiver: Receiver<UnitOfWork>) {
+        while let Some(uow) = receiver.recv().await {
             if let Err(err) = self.handle_uow(uow).await {
                 error!("handle uow {}", err);
             }
@@ -147,5 +147,34 @@ where
         self.file.seek(SeekFrom::Start(current)).await?;
 
         Ok(Some(entry))
+    }
+}
+
+impl<File> Table<File>
+where
+    File: AsyncRead + AsyncSeek + Unpin,
+{
+    pub(crate) async fn dump<F>(&mut self, mut callback: F) -> Result<()>
+    where
+        F: FnMut(EntryDump),
+    {
+        let current = self.file.seek(SeekFrom::Current(0)).await?;
+
+        self.file.seek(SeekFrom::Start(0)).await?;
+
+        loop {
+            match Entry::decode_from(&mut self.file).await {
+                Ok((_, entry)) => {
+                    callback(entry.into());
+                }
+                Err(err) if err.is_eof() => break,
+                Err(err) => {
+                    tracing::error!("{err}");
+                }
+            }
+        }
+
+        self.file.seek(SeekFrom::Start(current)).await?;
+        Ok(())
     }
 }

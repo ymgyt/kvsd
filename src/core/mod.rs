@@ -9,6 +9,7 @@ mod config;
 pub use self::config::{Config, UserEntry};
 
 mod table;
+pub(crate) use table::{EntryDump, Table};
 
 mod principal;
 pub(crate) use self::principal::Principal;
